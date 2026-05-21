@@ -143,8 +143,8 @@ const LAYOUT = [
         label: "Certificado Original",
         start: 132,
         end: 145,
-        type: "integer",
-        required: true
+        type: "integer_or_blank",
+        required: false
     },
     {
         name: "denominacion_ordenante",
@@ -247,21 +247,22 @@ function isValidCuit(cuitStr) {
 /**
  * Valida una sola línea.
  */
-function validateLine(lineNum, lineContent, expectedPeriod = null) {
+function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "FULL") {
     const errors = [];
 
     // Limpiar saltos de línea sin tocar espacios de padding
     const cleanLine = lineContent.replace(/\r?\n$/, "");
+    const expectedLength = fileType === "LITE" ? 145 : 198;
 
-    if (cleanLine.length !== 198) {
+    if (cleanLine.length !== expectedLength) {
         errors.push({
             line: lineNum,
             field: "linea_completa",
             start: 1,
-            end: 198,
+            end: expectedLength,
             value: `Longitud: ${cleanLine.length}`,
             rule: "longitud_fija",
-            message: `La línea debe tener exactamente 198 caracteres de ancho fijo, pero tiene ${cleanLine.length}.`
+            message: `La línea debe tener exactamente ${expectedLength} caracteres de ancho fijo para el formato ${fileType}, pero tiene ${cleanLine.length}.`
         });
         return errors;
     }
@@ -269,7 +270,11 @@ function validateLine(lineNum, lineContent, expectedPeriod = null) {
     let tipoDocVal = "";
     let cuitVal = "";
 
-    for (const field of LAYOUT) {
+    const fieldsToValidate = fileType === "LITE" 
+        ? LAYOUT.filter(f => f.end <= 145) 
+        : LAYOUT;
+
+    for (const field of fieldsToValidate) {
         const { name, label, start, end, type, required, allowedValues } = field;
         const rawVal = cleanLine.slice(start - 1, end);
 
@@ -446,6 +451,20 @@ function validateLine(lineNum, lineContent, expectedPeriod = null) {
 }
 
 /**
+ * Detecta si el archivo es LITE o FULL basándose en el ancho de la primera línea.
+ */
+function detectFileType(fileText) {
+    if (!fileText || fileText.trim() === "") return "FULL";
+    const lines = fileText.split(/\r?\n/);
+    if (lines.length === 0) return "FULL";
+    const firstLineClean = lines[0].replace(/\r?\n$/, "");
+    if (firstLineClean.length === 145) {
+        return "LITE";
+    }
+    return "FULL";
+}
+
+/**
  * Valida un archivo completo de SICORE.
  * Retorna reporte estructurado.
  */
@@ -454,7 +473,8 @@ function validateSicoreFile(fileText, expectedPeriod = null) {
         status: "VALID",
         processedLines: 0,
         errorCount: 0,
-        errors: []
+        errors: [],
+        fileType: "FULL"
     };
 
     if (!fileText || fileText.trim() === "") {
@@ -495,12 +515,44 @@ function validateSicoreFile(fileText, expectedPeriod = null) {
         return report;
     }
 
+    const fileType = detectFileType(fileText);
+    report.fileType = fileType;
     report.processedLines = lines.length;
+
+    const expectedLength = fileType === "LITE" ? 145 : 198;
+
+    // --- Validación de consistencia de longitud entre todas las filas ---
+    // Garantiza que todas las líneas tengan el mismo ancho que la primera detectada
+    const allLengths = new Set(lines.map(l => l.replace(/\r?\n$/, "").length));
+    if (allLengths.size > 1) {
+        const consistencyErrors = [];
+        lines.forEach((line, i) => {
+            const cleanLine = line.replace(/\r?\n$/, "");
+            if (cleanLine.length !== expectedLength) {
+                consistencyErrors.push({
+                    line: i + 1,
+                    field: "linea_completa",
+                    start: 1,
+                    end: expectedLength,
+                    value: `Longitud: ${cleanLine.length}`,
+                    rule: "inconsistencia_longitud",
+                    message: `Inconsistencia de formato: el archivo fue detectado como ${fileType} (${expectedLength} caracteres) pero esta línea tiene ${cleanLine.length} caracteres.`
+                });
+            }
+        });
+        if (consistencyErrors.length > 0) {
+            report.status = "INVALID";
+            report.errorCount = consistencyErrors.length;
+            report.errors = consistencyErrors;
+            return report;
+        }
+    }
+
     const allErrors = [];
 
     for (let i = 0; i < lines.length; i++) {
         const lineNum = i + 1;
-        const lineErrors = validateLine(lineNum, lines[i], expectedPeriod);
+        const lineErrors = validateLine(lineNum, lines[i], expectedPeriod, fileType);
         if (lineErrors.length > 0) {
             allErrors.push(...lineErrors);
         }

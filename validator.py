@@ -149,8 +149,8 @@ LAYOUT = [
         "label": "Certificado Original",
         "start": 132,
         "end": 145,
-        "type": "integer",
-        "required": True
+        "type": "integer_or_blank",
+        "required": False
     },
     {
         "name": "denominacion_ordenante",
@@ -247,26 +247,45 @@ def is_valid_cuit(cuit_str):
     return int(cuit[10]) == check_digit
 
 
-def validate_line(line_number, line_content, expected_period=None):
+def detect_file_type(lines):
+    """
+    Detecta si el archivo es de formato FULL (198 chars) o LITE (145 chars)
+    inspeccionando el largo de la primera línea no vacía.
+    Retorna "LITE" o "FULL".
+    """
+    for line in lines:
+        clean = line.replace("\r", "").replace("\n", "")
+        if clean.strip():  # primera línea con contenido real
+            if len(clean) == 145:
+                return "LITE"
+            return "FULL"
+    return "FULL"
+
+
+def validate_line(line_number, line_content, expected_period=None, file_type="FULL"):
     """
     Valida una única línea del archivo de texto contra las reglas del layout.
-    Ignora saltos de línea (\r, \n) para la validación de longitud exacta de 198 caracteres.
+    Ignora saltos de línea (\r, \n) para la validación de longitud exacta.
+    Para archivos LITE valida exactamente 145 posiciones y omite campos > 145.
     """
     errors = []
-    
+
     # Limpiar saltos de línea preservando espacios intermedios y de padding
     clean_line = line_content.replace("\r", "").replace("\n", "")
-    
+
+    # Ancho esperado según el tipo de archivo
+    expected_length = 145 if file_type == "LITE" else 198
+
     # Validación estructural: longitud exacta
-    if len(clean_line) != 198:
+    if len(clean_line) != expected_length:
         errors.append({
             "line": line_number,
             "field": "linea_completa",
             "start": 1,
-            "end": 198,
+            "end": expected_length,
             "value": f"Longitud: {len(clean_line)}",
             "rule": "longitud_fija",
-            "message": f"La línea debe tener exactamente 198 caracteres de ancho fijo, pero tiene {len(clean_line)}."
+            "message": f"La línea debe tener exactamente {expected_length} caracteres de ancho fijo para el formato {file_type}, pero tiene {len(clean_line)}."
         })
         return errors
 
@@ -274,8 +293,11 @@ def validate_line(line_number, line_content, expected_period=None):
     tipo_doc_val = ""
     cuit_val = ""
 
+    # Filtrar campos según el tipo de archivo
+    fields_to_validate = [f for f in LAYOUT if f["end"] <= 145] if file_type == "LITE" else LAYOUT
+
     # Validar campo por campo
-    for field in LAYOUT:
+    for field in fields_to_validate:
         name = field["name"]
         label = field["label"]
         start = field["start"]
@@ -438,13 +460,15 @@ def validate_line(line_number, line_content, expected_period=None):
 def validate_sicore_file(file_path, expected_period=None):
     """
     Procesa y valida un archivo completo de SICORE TXT.
+    Detecta automáticamente si es formato FULL (198 chars) o LITE (145 chars).
     Retorna un diccionario con el resumen de métricas y la lista de errores encontrados.
     """
     report = {
         "status": "VALID",
         "processed_lines": 0,
         "error_count": 0,
-        "errors": []
+        "errors": [],
+        "file_type": "FULL"
     }
 
     if not os.path.exists(file_path):
@@ -478,7 +502,7 @@ def validate_sicore_file(file_path, expected_period=None):
         report["error_count"] = 1
         return report
 
-    # Filtrar las líneas vacías del final para cumplir la regla confirmada por el usuario
+    # Filtrar las líneas vacías del final
     while lines and not lines[-1].strip():
         lines.pop()
 
@@ -496,12 +520,47 @@ def validate_sicore_file(file_path, expected_period=None):
         report["error_count"] = 1
         return report
 
+    # --- Detección del tipo de archivo ---
+    file_type = detect_file_type(lines)
+    report["file_type"] = file_type
+    expected_length = 145 if file_type == "LITE" else 198
+
+    # --- Validación de consistencia de longitud entre todas las filas ---
+    # Esto garantiza que todas las filas tengan el mismo ancho que la primera
+    all_lengths = set()
+    for line in lines:
+        clean = line.replace("\r", "").replace("\n", "")
+        all_lengths.add(len(clean))
+
+    if len(all_lengths) > 1:
+        # Hay líneas con diferentes longitudes: reportar cada una que no coincida
+        for i, line in enumerate(lines):
+            clean = line.replace("\r", "").replace("\n", "")
+            if len(clean) != expected_length:
+                report["errors"].append({
+                    "line": i + 1,
+                    "field": "linea_completa",
+                    "start": 1,
+                    "end": expected_length,
+                    "value": f"Longitud: {len(clean)}",
+                    "rule": "inconsistencia_longitud",
+                    "message": (
+                        f"Inconsistencia de formato: el archivo fue detectado como {file_type} "
+                        f"({expected_length} caracteres) pero esta línea tiene {len(clean)} caracteres."
+                    )
+                })
+        if report["errors"]:
+            report["status"] = "INVALID"
+            report["error_count"] = len(report["errors"])
+            report["processed_lines"] = len(lines)
+            return report
+
     report["processed_lines"] = len(lines)
     all_errors = []
 
     for i, line in enumerate(lines):
         line_num = i + 1
-        line_errors = validate_line(line_num, line, expected_period)
+        line_errors = validate_line(line_num, line, expected_period, file_type)
         if line_errors:
             all_errors.extend(line_errors)
 
@@ -532,9 +591,12 @@ if __name__ == "__main__":
     
     res = validate_sicore_file(args.file_path, args.period)
     
-    print(f"Estado del archivo: {res['status']}")
+    # Mostrar formato detectado
+    fmt = res.get("file_type", "FULL")
+    print(f"Formato detectado:             {fmt} ({'145' if fmt == 'LITE' else '198'} posiciones)")
+    print(f"Estado del archivo:            {res['status']}")
     print(f"Cantidad de líneas procesadas: {res['processed_lines']}")
-    print(f"Errores encontrados: {res['error_count']}")
+    print(f"Errores encontrados:           {res['error_count']}")
     print("-" * 60)
     
     if res["status"] == "INVALID":
@@ -543,5 +605,5 @@ if __name__ == "__main__":
             print(f"Línea {err['line']} | Campo {err['field']} | {pos} | Valor: '{err['value']}'\n  Error: {err['message']}\n")
         exit(1)
     else:
-        print("[CORRECTO] El archivo es 100% válido y cumple las especificaciones de layout de SICORE.")
+        print(f"[CORRECTO] El archivo es 100% válido y cumple las especificaciones de layout SICORE formato {fmt}.")
         exit(0)

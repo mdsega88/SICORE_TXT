@@ -370,6 +370,37 @@ header p {
     z-index: 1;
 }
 
+/* File Format Badge (Full vs Lite) */
+.file-format-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-heading);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 50px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    z-index: 1;
+}
+
+.file-format-badge.full {
+    background: hsla(263, 70%, 50%, 0.12);
+    border: 1px solid hsla(263, 70%, 50%, 0.25);
+    color: hsl(263, 100%, 75%);
+    box-shadow: 0 0 10px hsla(263, 70%, 50%, 0.15);
+}
+
+.file-format-badge.lite {
+    background: hsla(145, 80%, 40%, 0.12);
+    border: 1px solid hsla(145, 80%, 40%, 0.25);
+    color: hsl(145, 100%, 70%);
+    box-shadow: 0 0 10px hsla(145, 80%, 40%, 0.15);
+}
+
 /* Metrics Grid */
 .metrics-grid {
     display: grid;

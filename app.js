@@ -56,9 +56,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const recordModal = document.getElementById("recordModal");
     const modalCloseBtn = document.getElementById("modalCloseBtn");
 
+    // Badge de formato de archivo
+    const fileFormatBadge = document.getElementById("fileFormatBadge");
+
     // Estado local de la aplicación
     let currentFileContent = "";
     let currentLines = [];
+    let currentFileType = "FULL"; // Tipo detectado del archivo actual
     let parsedRecords = []; // Registros estructurados para el explorador
 
     // Formatear input de período de manera interactiva (MM/AAAA)
@@ -136,13 +140,27 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
+        // Detectar tipo de archivo (FULL=198 / LITE=145)
+        currentFileType = detectFileType(fileText);
+
+        // Campos FULL que no existen en LITE (inicio >= 146)
+        const liteExcludedFields = new Set(
+            LAYOUT.filter(f => f.start > 145).map(f => f.name)
+        );
+
         // Parsear cada registro basándose en la estructura oficial (LAYOUT)
         parsedRecords = currentLines.map((lineContent, index) => {
             const lineNum = index + 1;
-            const lineErrors = validateLine(lineNum, lineContent, expectedPeriod);
+            const lineErrors = validateLine(lineNum, lineContent, expectedPeriod, currentFileType);
             const fields = {};
 
             LAYOUT.forEach(field => {
+                // Para archivos LITE, los campos a partir de la pos 146 se dejan vacíos
+                if (currentFileType === "LITE" && liteExcludedFields.has(field.name)) {
+                    fields[field.name] = "".padEnd(field.end - field.start + 1, " ");
+                    return;
+                }
+
                 let val = "";
                 if (lineContent.length >= field.end) {
                     val = lineContent.slice(field.start - 1, field.end);
@@ -235,13 +253,26 @@ document.addEventListener("DOMContentLoaded", () => {
         totalComprobantesEl.textContent = formatCurrency(sumComprobantes);
         totalRetencionesEl.textContent = formatCurrency(sumRetenciones);
 
+        // --- Badge de Formato LITE / FULL ---
+        const ft = report.fileType || "FULL";
+        fileFormatBadge.className = "file-format-badge"; // reset clases
+        if (ft === "LITE") {
+            fileFormatBadge.classList.add("lite");
+            fileFormatBadge.textContent = "🍃 Formato Lite · 145 posiciones";
+        } else {
+            fileFormatBadge.classList.add("full");
+            fileFormatBadge.textContent = "⚡ Formato Full · 198 posiciones";
+        }
+        fileFormatBadge.style.display = "inline-flex";
+
         // Renderizar Estado
         statusCard.className = "card status-card";
+        const expectedLen = ft === "LITE" ? 145 : 198;
         if (report.status === "VALID") {
             statusCard.classList.add("valid");
             statusIndicator.textContent = "✓";
             statusTitle.textContent = "ARCHIVO VÁLIDO";
-            statusSubtitle.textContent = "El archivo cumple 100% con la estructura del layout de 198 caracteres de ancho fijo y las reglas analizadas.";
+            statusSubtitle.textContent = `El archivo cumple 100% con la estructura del layout de ${expectedLen} caracteres de ancho fijo y las reglas analizadas.`;
 
             // Ocultar detalle de errores
             detailCard.style.display = "none";
@@ -304,8 +335,8 @@ document.addEventListener("DOMContentLoaded", () => {
         infoFieldPos.textContent = `${err.start}-${err.end} (Largo: ${err.end - err.start + 1})`;
         infoFieldVal.textContent = `"${err.value}"`;
 
-        // Generar regla e índices superiores interactivos
-        rulerIndices.textContent = generateRulerString();
+        // Generar regla e índices superiores interactivos (longitud dinámica según tipo de archivo)
+        rulerIndices.textContent = generateRulerString(currentFileType);
 
         // Resaltar el segmento exacto del campo con error
         const before = rawLine.slice(0, err.start - 1);
@@ -346,12 +377,13 @@ document.addEventListener("DOMContentLoaded", () => {
         visualizerCard.style.display = "none";
     });
 
-    // Auxiliar: Genera regla numérica
-    function generateRulerString() {
+    // Auxiliar: Genera regla numérica dinámica según el tipo de archivo
+    function generateRulerString(fileType) {
+        const maxPos = (fileType === "LITE") ? 145 : 198;
         let ruler = "";
-        for (let i = 1; i <= 198; i++) {
+        for (let i = 1; i <= maxPos; i++) {
             if (i === 1) ruler += "1";
-            else if (i === 198) ruler += "198";
+            else if (i === maxPos) ruler += maxPos.toString();
             else if (i % 10 === 0) ruler += (i / 10).toString().slice(-1);
             else if (i % 5 === 0) ruler += "+";
             else ruler += ".";

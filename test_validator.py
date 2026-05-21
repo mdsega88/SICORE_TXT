@@ -6,7 +6,7 @@ Ejecutar con: python -m unittest test_validator.py
 
 import unittest
 import os
-from validator import parse_amount, is_valid_cuit, validate_line, validate_sicore_file
+from validator import parse_amount, is_valid_cuit, validate_line, validate_sicore_file, detect_file_type
 
 class TestSicoreValidator(unittest.TestCase):
 
@@ -100,6 +100,59 @@ class TestSicoreValidator(unittest.TestCase):
         # Cada una de las 29 líneas debería reportar el error de fecha_retencion fuera de período
         self.assertEqual(res["error_count"], 29)
         self.assertTrue(all(e["rule"] == "periodo_esperado" for e in res["errors"]))
+
+    def test_certificado_original_optional(self):
+        """El campo certificado_original puede ser blanco en formato FULL sin generar error."""
+        # Partir de la línea real de 198 chars y blanquear las posiciones 132-145
+        base_line = (
+            "0602/01/2026   00000000114730000006000000,00 217 94100004958677,69"
+            "02/01/202601 00000097830,15000,00          8030716967871         "
+            "00000000000000                              00000000000000000000000"
+        )
+        # Reemplazar certificado_original (pos 132-145, índice 131-144) con 14 espacios
+        valid_line = base_line[:131] + "              " + base_line[145:]
+        self.assertEqual(len(valid_line), 198)
+        errors = validate_line(1, valid_line, "01/2026")
+        # No debe haber ningún error relacionado con certificado_original
+        cert_errors = [e for e in errors if e["field"] == "certificado_original"]
+        self.assertEqual(cert_errors, [])
+
+
+    def test_validate_line_lite_valid(self):
+        """Una línea LITE de exactamente 145 caracteres debe validar sin errores."""
+        # Tomamos los primeros 145 caracteres de la línea real (incluyendo certificado_original)
+        full_line = (
+            "0602/01/2026   00000000114730000006000000,00 217 94100004958677,69"
+            "02/01/202601 00000097830,15000,00          8030716967871         "
+            "00000000000000                              00000000000000000000000"
+        )
+        lite_line = full_line[:145]
+        self.assertEqual(len(lite_line), 145)
+        errors = validate_line(1, lite_line, "01/2026", file_type="LITE")
+        self.assertEqual(errors, [], msg=f"Errores inesperados en LITE: {errors}")
+
+    def test_validate_line_lite_wrong_length(self):
+        """Una línea de 198 chars tratada como LITE debe fallar por longitud incorrecta."""
+        full_line = (
+            "0602/01/2026   00000000114730000006000000,00 217 94100004958677,69"
+            "02/01/202601 00000097830,15000,00          8030716967871         "
+            "00000000000000                              00000000000000000000000"
+        )
+        self.assertEqual(len(full_line), 198)
+        errors = validate_line(1, full_line, "01/2026", file_type="LITE")
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0]["rule"], "longitud_fija")
+
+    def test_detect_file_type(self):
+        """La detección de formato debe identificar LITE y FULL correctamente."""
+        full_line = "0602/01/2026   00000000114730000006000000,00 217 94100004958677,6902/01/202601 00000097830,15000,00          8030716967871         00000000000000                              00000000000000000000000"
+        self.assertEqual(len(full_line), 198)
+        self.assertEqual(detect_file_type([full_line]), "FULL")
+
+        lite_line = full_line[:145]
+        self.assertEqual(len(lite_line), 145)
+        self.assertEqual(detect_file_type([lite_line]), "LITE")
+
 
 if __name__ == "__main__":
     unittest.main()
