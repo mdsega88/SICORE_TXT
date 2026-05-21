@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador Técnico SICORE | Estudio Contable</title>
+    <meta name="description"
+        content="Validador técnico automático para archivos TXT SICORE de ancho fijo. Verificación instantánea de formatos, fechas, importes y CUITs.">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Header Principal -->
+        <header>
+            <span class="badge-preliminary" id="preliminaryBadge">Layout SICORE Base Identificado</span>
+            <h1 id="mainTitle">Validador Técnico SICORE</h1>
+            <p id="mainSubtitle">Verificación automática de integridad, longitudes de campo, formato de fechas, importes
+                y validación de CUITs para archivos de ancho fijo.</p>
+        </header>
+
+        <!-- Sección de Configuración y Carga de Archivo -->
+        <main class="setup-grid" id="setupSection">
+            <!-- Zona de Carga Drag & Drop -->
+            <div class="card dropzone" id="dropzone">
+                <div class="dropzone-content">
+                    <div class="dropzone-icon" id="dropzoneIcon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                    </div>
+                    <div class="dropzone-title" id="dropzoneTitle">Arrastra tu archivo TXT de SICORE aquí</div>
+                    <div class="dropzone-subtitle" id="dropzoneSubtitle">o haz clic para buscar en tu equipo</div>
+                </div>
+                <input type="file" id="fileInput" class="file-input" accept=".txt">
+            </div>
+
+            <!-- Formulario del Período Esperado -->
+            <div class="card" id="periodCard">
+                <div class="form-group">
+                    <label for="periodInput" class="form-label" id="periodLabel">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        Período Esperado
+                    </label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">📅</span>
+                        <input type="text" id="periodInput" class="form-input" placeholder="MM/AAAA" maxlength="7"
+                            autocomplete="off">
+                    </div>
+                    <p class="form-hint" id="periodHint">Ej: 01/2026. Si se ingresa, se validará que todas las fechas de
+                        retención coincidan con este mes y año.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Dashboard de Resultados (se muestra después de procesar) -->
+        <section id="dashboard" class="dashboard-section">
+            <div class="dashboard-header">
+                <!-- Tarjeta de Estado General -->
+                <div class="card status-card" id="statusCard">
+                    <div class="status-indicator" id="statusIndicator">✓</div>
+                    <div class="status-title" id="statusTitle">ARCHIVO VÁLIDO</div>
+                    <div class="status-subtitle" id="statusSubtitle">El archivo cumple con el layout de 198 caracteres y
+                        no tiene errores de validación.</div>
+                </div>
+
+                <!-- Métricas Clave -->
+                <div class="metrics-grid">
+                    <!-- Líneas Procesadas -->
+                    <div class="metric-card" id="metricProcessed">
+                        <div class="metric-header">
+                            <span>Líneas Procesadas</span>
+                            <span class="metric-icon">📑</span>
+                        </div>
+                        <div class="metric-value" id="processedLines">0</div>
+                        <div class="metric-footer">Registros de datos analizados</div>
+                    </div>
+
+                    <!-- Cantidad de Errores -->
+                    <div class="metric-card" id="metricErrors">
+                        <div class="metric-header">
+                            <span>Errores Totales</span>
+                            <span class="metric-icon">⚠</span>
+                        </div>
+                        <div class="metric-value" id="errorCount">0</div>
+                        <div class="metric-footer">Inconsistencias halladas</div>
+                    </div>
+
+                    <!-- Tasa de Integridad -->
+                    <div class="metric-card" id="metricRate">
+                        <div class="metric-header">
+                            <span>Tasa de Integridad</span>
+                            <span class="metric-icon">📊</span>
+                        </div>
+                        <div class="metric-value" id="successRate">100%</div>
+                        <div class="metric-footer">Líneas sin observaciones</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABS SYSTEM FOR SECONDARY VIEWS -->
+            <div class="tabs-container">
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabValidation">⚠️ Observaciones y Correcciones</button>
+                    <button class="tab-btn" id="tabReader">📖 Lector y Explorador de Datos</button>
+                </div>
+            </div>
+
+            <!-- PANEL 1: VALIDATION DETAILS -->
+            <div class="tab-panel" id="panelValidation">
+                <!-- Visualizador de Layout interactivo para análisis de errores de la línea -->
+                <div class="card visualizer-card" id="visualizerCard">
+                    <div class="visualizer-header">
+                        <div class="visualizer-title" id="visualizerTitle">
+                            <span>🔍</span> Análisis de la Línea Seleccionada
+                        </div>
+                        <button class="visualizer-close" id="visualizerCloseBtn" title="Cerrar análisis">✕</button>
+                    </div>
+                    <div class="visualizer-rulers" id="visualizerRulers">
+                        <div class="ruler-indices" id="rulerIndices"></div>
+                        <div class="ruler-text" id="rulerText">
+                            <span id="lineString"></span>
+                            <div class="ruler-highlight" id="rulerHighlight"></div>
+                        </div>
+                    </div>
+                    <div class="visualizer-info" id="visualizerInfo">
+                        <div class="visualizer-info-item">Línea: <span id="infoLineNum">-</span></div>
+                        <div class="visualizer-info-item">Campo: <span id="infoFieldName">-</span></div>
+                        <div class="visualizer-info-item">Posición: <span id="infoFieldPos">-</span></div>
+                        <div class="visualizer-info-item">Valor Encontrado: <span id="infoFieldVal">-</span></div>
+                    </div>
+                </div>
+
+                <!-- Tabla de Detalle de Errores -->
+                <div class="card" id="detailCard">
+                    <div class="errors-section-title" id="errorsTitle">
+                        Detalle de Observaciones
+                        <span class="errors-count-badge" id="errorBadge">0</span>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="error-table" id="errorTable">
+                            <thead>
+                                <tr>
+                                    <th>Línea</th>
+                                    <th>Severidad</th>
+                                    <th>Campo</th>
+                                    <th>Posiciones</th>
+                                    <th>Valor Encontrado</th>
+                                    <th>Mensaje de Error para el Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody id="errorTableBody">
+                                <!-- Se renderiza dinámicamente con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL 2: RECORD READER -->
+            <div class="tab-panel" id="panelReader" style="display: none;">
+                <!-- Panel de Búsqueda y Filtros -->
+                <div class="card search-card">
+                    <div class="search-flex">
+                        <div class="search-wrapper">
+                            <span class="search-icon">🔍</span>
+                            <input type="text" id="readerSearchInput"
+                                placeholder="Buscar por CUIT, nro de comprobante, régimen, importes...">
+                        </div>
+                        <div class="filter-wrapper">
+                            <label for="comprobanteFilter">Comprobante:</label>
+                            <select id="comprobanteFilter">
+                                <option value="">Todos</option>
+                                <option value="07">07 (Retención)</option>
+                                <option value="08">08 (Percepción)</option>
+                                <option value="06">06 (Factura B / Otros)</option>
+                            </select>
+                        </div>
+                        <div class="stats-mini">
+                            <span id="filteredCount">0</span> / <span id="totalCount">0</span> registros
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla del Lector -->
+                <div class="card reader-card">
+                    <div class="reader-header-flex">
+                        <div class="reader-title">Registros del Archivo Decodificados</div>
+                        <div class="reader-tip">💡 Haz clic en cualquier fila para ver el detalle de comprobante digital
+                            y auditoría.</div>
+                    </div>
+                    <div class="table-container">
+                        <table class="reader-table" id="readerTable">
+                            <thead>
+                                <tr>
+                                    <th>Línea</th>
+                                    <th>Comp.</th>
+                                    <th>Fecha Emisión</th>
+                                    <th>Nro. Comprobante</th>
+                                    <th>Importe Comp.</th>
+                                    <th>Impuesto</th>
+                                    <th>Régimen</th>
+                                    <th>Op.</th>
+                                    <th>Base Cálculo</th>
+                                    <th>Fecha Ret.</th>
+                                    <th>Condición</th>
+                                    <th>Suj. Susp.</th>
+                                    <th>Importe Ret.</th>
+                                    <th>% Excl.</th>
+                                    <th>Fecha Vig.</th>
+                                    <th>Tipo Doc</th>
+                                    <th>Doc / CUIT</th>
+                                    <th>Certif. Orig.</th>
+                                    <th>Denominación Ordenante</th>
+                                    <th>Acrecent.</th>
+                                    <th>CUIT País</th>
+                                    <th>CUIT Ord.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="readerTableBody">
+                                <!-- Se renderiza dinámicamente con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal de Detalle de Registro Digital -->
+    <div class="modal" id="recordModal">
+        <div class="modal-content card">
+            <div class="modal-header">
+                <h2 id="modalTitle">Comprobante Digital SICORE</h2>
+                <button class="modal-close" id="modalCloseBtn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="receipt-grid">
+                    <!-- Group 1: General Info -->
+                    <div class="receipt-group">
+                        <div class="receipt-group-title">Datos del Comprobante</div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Código de Comprobante</div>
+                            <div class="receipt-val" id="det_codigo_comprobante">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Fecha de Emisión</div>
+                            <div class="receipt-val" id="det_fecha_comprobante">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Número de Comprobante</div>
+                            <div class="receipt-val" id="det_numero_comprobante">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Importe del Comprobante</div>
+                            <div class="receipt-val highlight-val" id="det_importe_comprobante">-</div>
+                        </div>
+                    </div>
+                    <!-- Group 2: Retención Details -->
+                    <div class="receipt-group">
+                        <div class="receipt-group-title">Cálculo de la Retención</div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Base de Cálculo</div>
+                            <div class="receipt-val" id="det_base_calculo">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Fecha de Retención</div>
+                            <div class="receipt-val" id="det_fecha_retencion">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Código de Impuesto</div>
+                            <div class="receipt-val" id="det_codigo_impuesto">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Código de Régimen</div>
+                            <div class="receipt-val" id="det_codigo_regimen">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Código de Operación</div>
+                            <div class="receipt-val" id="det_codigo_operacion">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Código de Condición</div>
+                            <div class="receipt-val" id="det_condicion">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Sujetos Suspendidos</div>
+                            <div class="receipt-val" id="det_sujetos_suspendidos">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Importe de Retención</div>
+                            <div class="receipt-val highlight-success" id="det_importe_retencion">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Porcentaje de Exclusión</div>
+                            <div class="receipt-val" id="det_porcentaje_exclusion">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Fecha Vigencia Exclusión</div>
+                            <div class="receipt-val" id="det_fecha_vigencia">-</div>
+                        </div>
+                    </div>
+                    <!-- Group 3: Retenido Details -->
+                    <div class="receipt-group">
+                        <div class="receipt-group-title">Datos del Retenido</div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Tipo de Documento</div>
+                            <div class="receipt-val" id="det_tipo_documento">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Número de CUIT / Documento</div>
+                            <div class="receipt-val mono-val" id="det_documento_cuit">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Certificado Original</div>
+                            <div class="receipt-val" id="det_certificado_original">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">CUIT País Retenido</div>
+                            <div class="receipt-val" id="det_cuit_pais_retenido">-</div>
+                        </div>
+                    </div>
+                    <!-- Group 4: Ordenante Details -->
+                    <div class="receipt-group">
+                        <div class="receipt-group-title">Datos del Ordenante</div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Denominación del Ordenante</div>
+                            <div class="receipt-val" id="det_denominacion_ordenante">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Acrecentamiento</div>
+                            <div class="receipt-val" id="det_acrecentamiento">-</div>
+                        </div>
+                        <div class="receipt-item">
+                            <div class="receipt-label">Cuit del Ordenante</div>
+                            <div class="receipt-val mono-val" id="det_cuit_ordenante">-</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Audit alert if any error -->
+                <div id="modalAuditAlert" class="modal-audit-alert" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Scripts de validación y control -->
+        <script src="sicore-validator.js"></script>
+        <script src="app.js"></script>
+</body>
+
+</html>
