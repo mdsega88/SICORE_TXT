@@ -270,8 +270,8 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
     let tipoDocVal = "";
     let cuitVal = "";
 
-    const fieldsToValidate = fileType === "LITE" 
-        ? LAYOUT.filter(f => f.end <= 145) 
+    const fieldsToValidate = fileType === "LITE"
+        ? LAYOUT.filter(f => f.end <= 145)
         : LAYOUT;
 
     for (const field of fieldsToValidate) {

@@ -227,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
         parsedRecords.forEach(rec => {
             const rawComp = rec.fields["importe_comprobante"];
             const rawRet = rec.fields["importe_retencion"];
-            
+
             if (rawComp) {
                 const parsedComp = parseAmount(rawComp);
                 if (parsedComp !== null) {
@@ -457,11 +457,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 const raw = rec.rawContent.toLowerCase();
 
                 const matches = cuit.includes(searchText) ||
-                                num.includes(searchText) ||
-                                denom.includes(searchText) ||
-                                imp.includes(searchText) ||
-                                ret.includes(searchText) ||
-                                raw.includes(searchText);
+                    num.includes(searchText) ||
+                    denom.includes(searchText) ||
+                    imp.includes(searchText) ||
+                    ret.includes(searchText) ||
+                    raw.includes(searchText);
 
                 if (!matches) {
                     return false;
