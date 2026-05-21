@@ -22,6 +22,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const errorCountEl = document.getElementById("errorCount");
     const successRateEl = document.getElementById("successRate");
     const errorBadge = document.getElementById("errorBadge");
+    const totalComprobantesEl = document.getElementById("totalComprobantes");
+    const totalRetencionesEl = document.getElementById("totalRetenciones");
 
     // Tabla de Errores
     const errorTableBody = document.getElementById("errorTableBody");
@@ -199,6 +201,39 @@ document.addEventListener("DOMContentLoaded", () => {
         const correctLines = report.processedLines - uniqueLineErrors;
         const rate = report.processedLines > 0 ? Math.round((correctLines / report.processedLines) * 100) : 0;
         successRateEl.textContent = `${rate}%`;
+
+        // Calcular suma total de importes de comprobante y retenciones
+        let sumComprobantes = 0;
+        let sumRetenciones = 0;
+
+        parsedRecords.forEach(rec => {
+            const rawComp = rec.fields["importe_comprobante"];
+            const rawRet = rec.fields["importe_retencion"];
+            
+            if (rawComp) {
+                const parsedComp = parseAmount(rawComp);
+                if (parsedComp !== null) {
+                    sumComprobantes += parsedComp;
+                }
+            }
+            if (rawRet) {
+                const parsedRet = parseAmount(rawRet);
+                if (parsedRet !== null) {
+                    sumRetenciones += parsedRet;
+                }
+            }
+        });
+
+        // Formatear moneda con estándar es-AR (puntos para miles y comas para decimales)
+        const formatCurrency = (val) => {
+            return "$ " + val.toLocaleString("es-AR", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        };
+
+        totalComprobantesEl.textContent = formatCurrency(sumComprobantes);
+        totalRetencionesEl.textContent = formatCurrency(sumRetenciones);
 
         // Renderizar Estado
         statusCard.className = "card status-card";
