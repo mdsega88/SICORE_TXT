@@ -36,3 +36,6 @@ venv.bak/
 # Operating System files
 .DS_Store
 Thumbs.db
+
+# Local validation logs
+sicore_run_log.txt

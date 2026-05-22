@@ -44,6 +44,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabReader = document.getElementById("tabReader");
     const panelValidation = document.getElementById("panelValidation");
     const panelReader = document.getElementById("panelReader");
+    const tabLogs = document.getElementById("tabLogs");
+    const panelLogs = document.getElementById("panelLogs");
+    const downloadFullLogBtn = document.getElementById("downloadFullLogBtn");
+    const clearLogsBtn = document.getElementById("clearLogsBtn");
 
     // Filtros y Tabla del Lector
     const readerSearchInput = document.getElementById("readerSearchInput");
@@ -60,6 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileFormatBadge = document.getElementById("fileFormatBadge");
 
     // Estado local de la aplicación
+    let currentFileName = "";
     let currentFileContent = "";
     let currentLines = [];
     let currentFileType = "FULL"; // Tipo detectado del archivo actual
@@ -115,6 +120,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Por favor, sube únicamente archivos de texto plano (.txt)");
             return;
         }
+        currentFileName = file.name;
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -182,6 +188,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Ejecutar motor validador en JS
         const report = validateSicoreFile(fileText, expectedPeriod);
+
+        // Guardar la ejecución en el historial de logs
+        saveValidationLog(currentFileName || "archivo.txt", expectedPeriod, report);
 
         // Ocultar visualizador previo
         visualizerCard.style.display = "none";
@@ -407,17 +416,35 @@ document.addEventListener("DOMContentLoaded", () => {
     tabValidation.addEventListener("click", () => {
         tabValidation.classList.add("active");
         tabReader.classList.remove("active");
+        tabLogs.classList.remove("active");
         panelValidation.style.display = "block";
         panelReader.style.display = "none";
+        panelLogs.style.display = "none";
     });
 
     tabReader.addEventListener("click", () => {
         tabReader.classList.add("active");
         tabValidation.classList.remove("active");
+        tabLogs.classList.remove("active");
         panelValidation.style.display = "none";
         panelReader.style.display = "block";
+        panelLogs.style.display = "none";
         renderReaderTable();
     });
+
+    tabLogs.addEventListener("click", () => {
+        tabLogs.classList.add("active");
+        tabValidation.classList.remove("active");
+        tabReader.classList.remove("active");
+        panelValidation.style.display = "none";
+        panelReader.style.display = "none";
+        panelLogs.style.display = "block";
+        renderLogsTable();
+    });
+
+    // Eventos del Historial de Logs
+    downloadFullLogBtn.addEventListener("click", downloadFullLog);
+    clearLogsBtn.addEventListener("click", clearLogs);
 
     // --- EXPLORADOR Y FILTRADO DEL LECTOR ---
     function renderReaderTable() {
@@ -617,4 +644,108 @@ document.addEventListener("DOMContentLoaded", () => {
             recordModal.style.display = "none";
         }
     });
+
+    // --- FUNCIONES DEL HISTORIAL DE LOGS ---
+    function saveValidationLog(fileName, period, report) {
+        const logs = JSON.parse(localStorage.getItem("sicore_web_logs") || "[]");
+        
+        const timestamp = new Date().toLocaleString("es-AR");
+        const statusStr = report.status === "VALID" ? "OK" : `CON ERRORES (${report.errorCount})`;
+        const periodStr = period ? period : "No especificado";
+        
+        const logLine = `[${new Date().toISOString().replace('T', ' ').substring(0, 19)}] Archivo: ${fileName} | Periodo: ${periodStr} | Formato: ${report.fileType} | Estado: ${statusStr}`;
+
+        const newLog = {
+            id: Date.now(),
+            timestamp,
+            fileName,
+            period: periodStr,
+            fileType: report.fileType,
+            status: report.status,
+            processedLines: report.processedLines,
+            errorCount: report.errorCount,
+            logLine: logLine
+        };
+
+        logs.unshift(newLog); // Agregar al inicio
+        localStorage.setItem("sicore_web_logs", JSON.stringify(logs));
+    }
+
+    function renderLogsTable() {
+        const logsTableBody = document.getElementById("logsTableBody");
+        const logs = JSON.parse(localStorage.getItem("sicore_web_logs") || "[]");
+
+        if (logs.length === 0) {
+            logsTableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 45px; color: var(--text-muted); font-family: var(--font-body);">
+                        No hay registros de validaciones en esta sesión. Cargue un archivo para iniciar.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        logsTableBody.innerHTML = "";
+        logs.forEach(log => {
+            const tr = document.createElement("tr");
+            
+            const isOk = log.status === "VALID";
+            const badgeClass = isOk ? "ok-badge" : "error-badge";
+            const badgeText = isOk ? "✓ VÁLIDO" : `⚠ ERRORES (${log.errorCount})`;
+            
+            const formatBadgeClass = log.fileType === "LITE" ? "lite-badge" : "full-badge";
+            
+            tr.innerHTML = `
+                <td>${log.timestamp}</td>
+                <td style="font-weight: 500; color: var(--text-primary);">${escapeHtml(log.fileName)}</td>
+                <td>${log.period}</td>
+                <td><span class="file-type-badge-mini ${formatBadgeClass}">${log.fileType}</span></td>
+                <td><span class="status-badge-mini ${badgeClass}">${badgeText}</span></td>
+                <td>${log.processedLines}</td>
+                <td>${log.errorCount}</td>
+                <td>
+                    <button class="download-single-log-btn" data-id="${log.id}" style="background: hsla(215, 20%, 65%, 0.15); border: 1px solid var(--border-color); color: var(--text-primary); padding: 5px 10px; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; transition: background 0.2s;">
+                        📥 TXT
+                    </button>
+                </td>
+            `;
+            
+            // Listener para descargar este log individual
+            const btn = tr.querySelector(".download-single-log-btn");
+            btn.addEventListener("click", () => {
+                downloadTxtFile(`log_${log.fileName}`, log.logLine);
+            });
+
+            logsTableBody.appendChild(tr);
+        });
+    }
+
+    function downloadFullLog() {
+        const logs = JSON.parse(localStorage.getItem("sicore_web_logs") || "[]");
+        if (logs.length === 0) {
+            alert("No hay registros en el historial para descargar.");
+            return;
+        }
+        const text = logs.map(log => log.logLine).join("\n");
+        downloadTxtFile("sicore_run_log.txt", text);
+    }
+
+    function clearLogs() {
+        if (confirm("¿Estás seguro de que deseas limpiar todo el historial de logs del navegador?")) {
+            localStorage.removeItem("sicore_web_logs");
+            renderLogsTable();
+        }
+    }
+
+    function downloadTxtFile(filename, text) {
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', filename);
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
 });
+

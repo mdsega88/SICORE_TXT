@@ -15,10 +15,15 @@
     <div class="container">
         <!-- Header Principal -->
         <header>
-            <span class="badge-preliminary" id="preliminaryBadge">Layout SICORE Base Identificado</span>
-            <h1 id="mainTitle">Validador Técnico SICORE</h1>
-            <p id="mainSubtitle">Verificación automática de integridad, longitudes de campo, formato de fechas, importes
-                y validación de CUITs para archivos de ancho fijo.</p>
+            <div class="logo-wrapper">
+                <img src="logo.png" alt="Logo" class="header-logo">
+            </div>
+            <div class="header-content">
+                <span class="badge-preliminary" id="preliminaryBadge">Layout SICORE Base Identificado</span>
+                <h1 id="mainTitle">Validador Técnico SICORE</h1>
+                <p id="mainSubtitle">Verificación automática de integridad, longitudes de campo, formato de fechas, importes
+                    y validación de CUITs para archivos de ancho fijo.</p>
+            </div>
         </header>
 
         <!-- Sección de Configuración y Carga de Archivo -->
@@ -135,6 +140,7 @@
                 <div class="tabs">
                     <button class="tab-btn active" id="tabValidation">⚠️ Observaciones y Correcciones</button>
                     <button class="tab-btn" id="tabReader">📖 Lector y Explorador de Datos</button>
+                    <button class="tab-btn" id="tabLogs">📋 Historial de Ejecuciones</button>
                 </div>
             </div>
 
@@ -252,6 +258,50 @@
                             </thead>
                             <tbody id="readerTableBody">
                                 <!-- Se renderiza dinámicamente con JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL 3: EXECUTION LOGS -->
+            <div class="tab-panel" id="panelLogs" style="display: none;">
+                <!-- Acciones globales del Log -->
+                <div class="card search-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <h3 style="font-family: var(--font-heading); margin-bottom: 5px;">Historial de Validaciones</h3>
+                            <p style="color: var(--text-secondary); font-size: 0.9rem;">Registro de todos los archivos procesados en esta sesión de navegador.</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="downloadFullLogBtn" class="action-btn-logs" style="background: var(--accent-gradient); border: none; color: white; padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: transform 0.2s;">
+                                📥 Descargar Log Completo (.txt)
+                            </button>
+                            <button id="clearLogsBtn" class="action-btn-logs" style="background: hsla(354, 76%, 53%, 0.15); border: 1px solid var(--error); color: var(--error); padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: transform 0.2s;">
+                                🗑️ Limpiar Historial
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla del Log -->
+                <div class="card reader-card">
+                    <div class="table-container">
+                        <table class="reader-table" id="logsTable">
+                            <thead>
+                                <tr>
+                                    <th>Fecha/Hora</th>
+                                    <th>Nombre del Archivo</th>
+                                    <th>Período Esperado</th>
+                                    <th>Formato</th>
+                                    <th>Estado</th>
+                                    <th>Registros</th>
+                                    <th>Errores</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody">
+                                <!-- Se renderiza dinámicamente -->
                             </tbody>
                         </table>
                     </div>

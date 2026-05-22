@@ -73,9 +73,46 @@ body {
 
 /* Header Styles */
 header {
-    text-align: center;
-    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    text-align: left;
+    margin-bottom: 15px;
     animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.logo-wrapper {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsla(222, 24%, 15%, 0.4);
+    padding: 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 8px 20px -5px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.logo-wrapper:hover {
+    border-color: hsla(263, 70%, 50%, 0.5);
+    box-shadow: 0 0 20px 0 hsla(263, 70%, 50%, 0.2);
+}
+
+.header-logo {
+    height: 70px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 10px rgba(255, 235, 59, 0.15)) drop-shadow(0 0 10px rgba(186, 73, 95, 0.2));
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.logo-wrapper:hover .header-logo {
+    transform: scale(1.06) rotate(-2deg);
+}
+
+.header-content {
+    flex-grow: 1;
 }
 
 .badge-preliminary {
@@ -89,7 +126,7 @@ header {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     backdrop-filter: blur(5px);
 }
 
@@ -101,15 +138,27 @@ header h1 {
     background: linear-gradient(135deg, #fff 30%, var(--text-secondary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 header p {
     color: var(--text-secondary);
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 400;
-    max-width: 600px;
-    margin: 0 auto;
+    max-width: 850px;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    header p {
+        margin: 0 auto;
+    }
 }
 
 /* Glassmorphism Cards */
@@ -1137,4 +1186,53 @@ header p {
     to {
         opacity: 1;
     }
+}
+
+/* Mini Badges and Execution Logs Styling */
+.file-type-badge-mini {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.file-type-badge-mini.full-badge {
+    background: hsla(263, 70%, 50%, 0.15);
+    color: hsl(263, 80%, 75%);
+    border: 1px solid hsla(263, 70%, 50%, 0.3);
+}
+.file-type-badge-mini.lite-badge {
+    background: hsla(150, 84%, 37%, 0.15);
+    color: hsl(150, 80%, 70%);
+    border: 1px solid hsla(150, 84%, 37%, 0.3);
+}
+
+.status-badge-mini {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.status-badge-mini.ok-badge {
+    background: hsla(150, 84%, 37%, 0.15);
+    color: hsl(150, 80%, 70%);
+    border: 1px solid hsla(150, 84%, 37%, 0.3);
+}
+.status-badge-mini.error-badge {
+    background: hsla(354, 76%, 53%, 0.15);
+    color: hsl(354, 80%, 75%);
+    border: 1px solid hsla(354, 76%, 53%, 0.3);
+}
+
+.action-btn-logs:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.action-btn-logs:active {
+    transform: translateY(0);
 }

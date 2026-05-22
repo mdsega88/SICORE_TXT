@@ -569,7 +569,32 @@ def validate_sicore_file(file_path, expected_period=None):
         report["error_count"] = len(all_errors)
         report["errors"] = all_errors
 
+    # Guardar en logueo local txt
+    write_execution_log(file_path, expected_period, report["status"], report["error_count"], report["file_type"])
+
     return report
+
+
+def write_execution_log(file_path, period, status, error_count, file_type):
+    """
+    Guarda un logueo en un archivo txt local con el nombre del file, período,
+    estado (OK o ERRORES) y la fecha/hora actual.
+    """
+    log_file = "sicore_run_log.txt"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    file_name = os.path.basename(file_path)
+    period_str = period if period else "No especificado"
+    status_str = "OK" if status == "VALID" else f"CON ERRORES ({error_count} observaciones)"
+    
+    log_line = f"[{timestamp}] Archivo: {file_name} | Periodo: {period_str} | Formato: {file_type} | Estado: {status_str}\n"
+    
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_line)
+    except Exception as e:
+        print(f"[ADVERTENCIA] No se pudo guardar el archivo de log: {e}")
+
+
 
 
 if __name__ == "__main__":
