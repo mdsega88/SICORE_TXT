@@ -64,6 +64,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileFormatBadge = document.getElementById("fileFormatBadge");
 
     // Estado local de la aplicación
+    const dropzoneContent = dropzone.querySelector(".dropzone-content");
+    const initialDropzoneHTML = dropzoneContent.innerHTML;
+
     let currentFileName = "";
     let currentFileContent = "";
     let currentLines = [];
@@ -78,8 +81,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         e.target.value = val;
 
-        // Re-validar si ya hay un archivo cargado
-        if (currentFileContent) {
+        // Re-validar si ya hay un archivo cargado y procesado
+        if (currentFileContent && dashboard.style.display === "flex") {
             processFileContent(currentFileContent);
         }
     });
@@ -104,7 +107,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    dropzone.addEventListener("click", () => {
+    dropzone.addEventListener("click", (e) => {
+        // Si hacemos clic en los botones de acción del dropzone, no disparamos la carga de archivo
+        if (e.target.closest('.dropzone-actions')) {
+            return;
+        }
         fileInput.click();
     });
 
@@ -121,13 +128,56 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
         currentFileName = file.name;
+        const fileSizeKB = (file.size / 1024).toFixed(1);
 
         const reader = new FileReader();
         reader.onload = (e) => {
             currentFileContent = e.target.result;
-            processFileContent(currentFileContent);
+            showConfirmationState(file.name, fileSizeKB);
         };
         reader.readAsText(file);
+    }
+
+    // Mostrar estado de confirmación con el botón procesar y cancelar
+    function showConfirmationState(fileName, fileSizeKB) {
+        dropzoneContent.innerHTML = `
+            <div class="dropzone-icon ready" style="background: hsla(263, 70%, 50%, 0.15); border-color: hsla(263, 70%, 50%, 0.3); color: hsl(263, 80%, 65%);">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <div class="dropzone-title" style="word-break: break-all; max-width: 90%; margin: 0 auto;">${escapeHtml(fileName)}</div>
+            <div class="dropzone-subtitle">Archivo listo · ${fileSizeKB} KB</div>
+            <div class="dropzone-actions" style="display: flex; gap: 12px; margin-top: 15px; z-index: 10; position: relative;">
+                <button id="processFileBtn" class="confirm-btn">🚀 Validar y Analizar</button>
+                <button id="cancelFileBtn" class="cancel-btn">Cargar otro</button>
+            </div>
+        `;
+
+        // Vincular eventos a los nuevos botones
+        document.getElementById("processFileBtn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            processFileContent(currentFileContent);
+        });
+
+        document.getElementById("cancelFileBtn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            resetDropzone();
+        });
+    }
+
+    // Restaurar dropzone a su estado inicial
+    function resetDropzone() {
+        dropzoneContent.innerHTML = initialDropzoneHTML;
+        currentFileName = "";
+        currentFileContent = "";
+        fileInput.value = "";
+        dashboard.style.display = "none";
     }
 
     // Orquestador de validación y renderizado

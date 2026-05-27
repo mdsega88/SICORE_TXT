@@ -155,7 +155,7 @@ header p {
         text-align: center;
         gap: 15px;
     }
-    
+
     header p {
         margin: 0 auto;
     }
@@ -1198,11 +1198,13 @@ header p {
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
+
 .file-type-badge-mini.full-badge {
     background: hsla(263, 70%, 50%, 0.15);
     color: hsl(263, 80%, 75%);
     border: 1px solid hsla(263, 70%, 50%, 0.3);
 }
+
 .file-type-badge-mini.lite-badge {
     background: hsla(150, 84%, 37%, 0.15);
     color: hsl(150, 80%, 70%);
@@ -1218,11 +1220,13 @@ header p {
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
+
 .status-badge-mini.ok-badge {
     background: hsla(150, 84%, 37%, 0.15);
     color: hsl(150, 80%, 70%);
     border: 1px solid hsla(150, 84%, 37%, 0.3);
 }
+
 .status-badge-mini.error-badge {
     background: hsla(354, 76%, 53%, 0.15);
     color: hsl(354, 80%, 75%);
@@ -1233,6 +1237,54 @@ header p {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+
 .action-btn-logs:active {
     transform: translateY(0);
+}
+
+/* Confirmation and Action Buttons inside Dropzone */
+.confirm-btn {
+    background: var(--accent-gradient);
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 50px;
+    font-family: var(--font-heading);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 15px var(--accent-glow);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.confirm-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px var(--accent-glow);
+    filter: brightness(1.1);
+}
+
+.confirm-btn:active {
+    transform: translateY(0);
+}
+
+.cancel-btn {
+    background: hsla(222, 24%, 15%, 0.4);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 10px 20px;
+    border-radius: 50px;
+    font-family: var(--font-heading);
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.cancel-btn:hover {
+    color: var(--text-primary);
+    background: hsla(222, 24%, 20%, 0.6);
+    border-color: var(--text-muted);
 }
