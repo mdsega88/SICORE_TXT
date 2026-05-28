@@ -309,8 +309,27 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         };
 
-        totalComprobantesEl.textContent = formatCurrency(sumComprobantes);
-        totalRetencionesEl.textContent = formatCurrency(sumRetenciones);
+        const setResponsiveCurrency = (el, val) => {
+            const formatted = formatCurrency(val);
+            const compactLength = formatted.replace(/\s/g, "").length;
+            let size = "2.1rem";
+
+            if (compactLength > 18) {
+                size = "1.2rem";
+            } else if (compactLength > 16) {
+                size = "1.35rem";
+            } else if (compactLength > 14) {
+                size = "1.55rem";
+            } else if (compactLength > 12) {
+                size = "1.75rem";
+            }
+
+            el.textContent = formatted;
+            el.style.setProperty("--metric-value-size", size);
+        };
+
+        setResponsiveCurrency(totalComprobantesEl, sumComprobantes);
+        setResponsiveCurrency(totalRetencionesEl, sumRetenciones);
 
         // --- Badge de Formato LITE / FULL ---
         const ft = report.fileType || "FULL";
@@ -798,4 +817,3 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.removeChild(element);
     }
 });
-

@@ -214,6 +214,43 @@ def parse_amount(val):
         return None
 
 
+NON_ZERO_FIELDS = {
+    "codigo_comprobante",
+    "numero_comprobante",
+    "importe_comprobante",
+    "codigo_impuesto",
+    "codigo_regimen",
+    "codigo_operacion",
+    "base_calculo",
+    "condicion",
+    "importe_retencion",
+    "tipo_documento",
+    "documento_cuit",
+}
+
+
+def is_zero_value(raw_val, field_type):
+    val_clean = raw_val.strip()
+    if val_clean == "":
+        return False
+
+    if field_type in ["amount", "amount_or_zero"]:
+        return re.match(r"^0+(,0+)?$", val_clean) is not None
+
+    digits = re.sub(r"\D", "", val_clean)
+    return digits != "" and re.match(r"^0+$", digits) is not None
+
+
+def parse_sicore_date(val):
+    val_clean = val.strip()
+    if not re.match(r"^\d{2}/\d{2}/\d{4}$", val_clean):
+        return None
+    try:
+        return datetime.strptime(val_clean, "%d/%m/%Y")
+    except ValueError:
+        return None
+
+
 def is_valid_cuit(cuit_str):
     """
     Valida el algoritmo matemático del dígito verificador del CUIT en Argentina.
@@ -292,6 +329,7 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
     # Datos auxiliares para validación cruzada
     tipo_doc_val = ""
     cuit_val = ""
+    raw_fields = {}
 
     # Filtrar campos según el tipo de archivo
     fields_to_validate = [f for f in LAYOUT if f["end"] <= 145] if file_type == "LITE" else LAYOUT
@@ -307,6 +345,7 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
         
         # Extraer subcadena según la posición (1-based, inclusive)
         raw_val = clean_line[start-1:end]
+        raw_fields[name] = raw_val
         
         if name == "tipo_documento":
             tipo_doc_val = raw_val
@@ -328,6 +367,18 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
                 continue
 
         # Validación según tipo de dato
+        if name in NON_ZERO_FIELDS and is_zero_value(raw_val, f_type):
+            errors.append({
+                "line": line_number,
+                "field": name,
+                "start": start,
+                "end": end,
+                "value": raw_val,
+                "rule": "valor_cero_no_permitido",
+                "message": f"El campo '{label}' no puede estar vacio ni contener un valor en cero."
+            })
+            continue
+
         if f_type == "string":
             if "allowed_values" in field:
                 val_clean = raw_val.strip()
@@ -421,7 +472,7 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
             # Validamos si es CUIT/CUIL según tipo de documento
             tipo_doc_clean = tipo_doc_val.strip()
             if tipo_doc_clean in ["80", "86"]:
-                cuit_digits = "".join(c for c in val_clean if c.isdigit())
+                cuit_digits = "".join(c for c in val_clean if c.isdigit()).lstrip("0")
                 if len(cuit_digits) != 11:
                     errors.append({
                         "line": line_number,
@@ -453,6 +504,32 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
                         "rule": "formato_documento",
                         "message": f"El documento debe contener únicamente dígitos numéricos. Encontrado: '{val_clean}'."
                     })
+
+    base_calculo = parse_amount(raw_fields.get("base_calculo", ""))
+    importe_retencion = parse_amount(raw_fields.get("importe_retencion", ""))
+    if base_calculo is not None and importe_retencion is not None and base_calculo < importe_retencion:
+        errors.append({
+            "line": line_number,
+            "field": "base_calculo",
+            "start": 53,
+            "end": 66,
+            "value": raw_fields.get("base_calculo", ""),
+            "rule": "base_menor_importe_retencion",
+            "message": "La Base de Calculo no puede ser menor al Importe de Retencion."
+        })
+
+    fecha_comprobante = parse_sicore_date(raw_fields.get("fecha_comprobante", ""))
+    fecha_retencion = parse_sicore_date(raw_fields.get("fecha_retencion", ""))
+    if fecha_comprobante and fecha_retencion and fecha_comprobante > fecha_retencion:
+        errors.append({
+            "line": line_number,
+            "field": "fecha_comprobante",
+            "start": 3,
+            "end": 12,
+            "value": raw_fields.get("fecha_comprobante", ""),
+            "rule": "fecha_comprobante_posterior_retencion",
+            "message": "La Fecha de Comprobante no puede ser posterior a la Fecha de Retencion."
+        })
 
     return errors
 

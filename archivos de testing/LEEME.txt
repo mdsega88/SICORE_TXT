@@ -1,0 +1,52 @@
+Archivos de testing para SICORE
+
+Usar periodo esperado: 01/2026
+
+Validos:
+- 00_VALIDO_base.txt: dos registros validos.
+- 01_VALIDO_cuit_con_ceros_adelante.txt: CUIT valido con ceros de padding adelante.
+
+Errores por valor cero:
+- 02_MAL_comp_cero.txt
+- 03_MAL_nro_comprobante_cero.txt
+- 04_MAL_importe_comprobante_cero.txt
+- 05_MAL_impuesto_cero.txt
+- 06_MAL_regimen_cero.txt
+- 07_MAL_operacion_cero.txt
+- 08_MAL_base_calculo_cero.txt
+- 09_MAL_condicion_cero.txt
+- 10_MAL_importe_retencion_cero.txt
+- 11_MAL_tipo_doc_cero.txt
+- 12_MAL_doc_cuit_cero.txt
+
+Errores por reglas cruzadas:
+- 13_MAL_fecha_comprobante_posterior_retencion.txt
+- 14_MAL_base_menor_importe_retencion.txt
+
+Errores por campo vacio:
+- 15_MAL_campo_vacio_fecha_comprobante.txt
+- 16_MAL_campo_vacio_doc_cuit.txt
+- 18_MAL_comp_vacio.txt
+- 19_MAL_nro_comprobante_vacio.txt
+- 20_MAL_importe_comprobante_vacio.txt
+- 21_MAL_impuesto_vacio.txt
+- 22_MAL_regimen_vacio.txt
+- 23_MAL_operacion_vacio.txt
+- 24_MAL_base_calculo_vacio.txt
+- 25_MAL_condicion_vacio.txt
+- 26_MAL_importe_retencion_vacio.txt
+- 27_MAL_tipo_doc_vacio.txt
+- 28_MAL_doc_cuit_vacio.txt
+
+Errores combinados:
+- 17_MAL_varios_errores_nuevos.txt
+
+Prueba integral:
+- 99_MIXTO_validos_y_errores_nuevos.txt: archivo unico con 27 registros.
+  - Lineas 1 y 2: validas.
+  - Lineas 3 a 13: valores en cero para los campos pedidos.
+  - Lineas 14 y 15: reglas cruzadas de fecha y base de calculo.
+  - Lineas 16 a 26: campos vacios para los campos pedidos.
+  - Linea 27: errores combinados.
+  - Resultado esperado con periodo 01/2026: INVALID, 27 lineas procesadas, 28 observaciones.
+  - Nota: la linea 9 genera 2 observaciones porque la base de calculo esta en cero y tambien queda menor al importe de retencion.

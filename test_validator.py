@@ -9,6 +9,15 @@ import os
 from validator import parse_amount, is_valid_cuit, validate_line, validate_sicore_file, detect_file_type
 
 class TestSicoreValidator(unittest.TestCase):
+    VALID_LINE = (
+        "0602/01/2026   00000000114730000006000000,00 217 94100004958677,69"
+        "02/01/202601 00000097830,15000,00          8030716967871         "
+        "00000000000000                              00000000000000000000000"
+    )
+
+    def replace_field(self, line, start, end, value):
+        self.assertEqual(len(value), end - start + 1)
+        return line[:start - 1] + value + line[end:]
 
     def test_parse_amount(self):
         # Casos válidos
@@ -142,6 +151,45 @@ class TestSicoreValidator(unittest.TestCase):
         errors = validate_line(1, full_line, "01/2026", file_type="LITE")
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0]["rule"], "longitud_fija")
+
+    def test_non_zero_required_fields_reject_zero_values(self):
+        zero_cases = [
+            ("codigo_comprobante", 1, 2, "00"),
+            ("numero_comprobante", 13, 28, "0000000000000000"),
+            ("importe_comprobante", 29, 44, "0000000000000,00"),
+            ("codigo_impuesto", 45, 48, "0000"),
+            ("codigo_regimen", 49, 51, "000"),
+            ("codigo_operacion", 52, 52, "0"),
+            ("base_calculo", 53, 66, "00000000000,00"),
+            ("condicion", 77, 78, "00"),
+            ("importe_retencion", 80, 93, "00000000000,00"),
+            ("tipo_documento", 110, 111, "00"),
+            ("documento_cuit", 112, 131, "00000000000000000000"),
+        ]
+
+        for field, start, end, value in zero_cases:
+            with self.subTest(field=field):
+                line = self.replace_field(self.VALID_LINE, start, end, value)
+                errors = validate_line(1, line, "01/2026")
+                self.assertTrue(
+                    any(e["field"] == field and e["rule"] == "valor_cero_no_permitido" for e in errors),
+                    msg=f"No se detecto cero no permitido para {field}: {errors}"
+                )
+
+    def test_cuit_accepts_leading_zero_padding(self):
+        line = self.replace_field(self.VALID_LINE, 112, 131, "00000000030716967871")
+        errors = validate_line(1, line, "01/2026")
+        self.assertEqual(errors, [])
+
+    def test_base_calculo_cannot_be_less_than_importe_retencion(self):
+        line = self.replace_field(self.VALID_LINE, 53, 66, "00000000100,00")
+        errors = validate_line(1, line, "01/2026")
+        self.assertTrue(any(e["rule"] == "base_menor_importe_retencion" for e in errors))
+
+    def test_fecha_comprobante_cannot_be_after_fecha_retencion(self):
+        line = self.replace_field(self.VALID_LINE, 3, 12, "03/01/2026")
+        errors = validate_line(1, line, "01/2026")
+        self.assertTrue(any(e["rule"] == "fecha_comprobante_posterior_retencion" for e in errors))
 
     def test_detect_file_type(self):
         """La detección de formato debe identificar LITE y FULL correctamente."""

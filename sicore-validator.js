@@ -205,6 +205,53 @@ function parseAmount(val) {
     return isNaN(parsed) ? null : parsed;
 }
 
+const NON_ZERO_FIELDS = new Set([
+    "codigo_comprobante",
+    "numero_comprobante",
+    "importe_comprobante",
+    "codigo_impuesto",
+    "codigo_regimen",
+    "codigo_operacion",
+    "base_calculo",
+    "condicion",
+    "importe_retencion",
+    "tipo_documento",
+    "documento_cuit"
+]);
+
+function isZeroValue(rawVal, type) {
+    const valClean = rawVal.trim();
+    if (valClean === "") {
+        return false;
+    }
+
+    if (type === "amount" || type === "amount_or_zero") {
+        return /^0+(,0+)?$/.test(valClean);
+    }
+
+    const digits = valClean.replace(/\D/g, "");
+    return digits !== "" && /^0+$/.test(digits);
+}
+
+function parseSicoreDate(val) {
+    const valClean = val.trim();
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(valClean)) {
+        return null;
+    }
+
+    const parts = valClean.split("/");
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    const dateObj = new Date(year, month, day);
+
+    if (dateObj.getFullYear() !== year || dateObj.getMonth() !== month || dateObj.getDate() !== day) {
+        return null;
+    }
+
+    return dateObj;
+}
+
 /**
  * Valida algoritmo del CUIT de Argentina.
  */
@@ -269,6 +316,7 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
 
     let tipoDocVal = "";
     let cuitVal = "";
+    const rawFields = {};
 
     const fieldsToValidate = fileType === "LITE"
         ? LAYOUT.filter(f => f.end <= 145)
@@ -277,6 +325,7 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
     for (const field of fieldsToValidate) {
         const { name, label, start, end, type, required, allowedValues } = field;
         const rawVal = cleanLine.slice(start - 1, end);
+        rawFields[name] = rawVal;
 
         if (name === "tipo_documento") {
             tipoDocVal = rawVal;
@@ -298,6 +347,19 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
                 });
                 continue;
             }
+        }
+
+        if (NON_ZERO_FIELDS.has(name) && isZeroValue(rawVal, type)) {
+            errors.push({
+                line: lineNum,
+                field: name,
+                start,
+                end,
+                value: rawVal,
+                rule: "valor_cero_no_permitido",
+                message: `El campo '${label}' no puede estar vacio ni contener un valor en cero.`
+            });
+            continue;
         }
 
         // Validaciones por tipo
@@ -409,7 +471,7 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
             const tipoDocClean = tipoDocVal.trim();
 
             if (tipoDocClean === "80" || tipoDocClean === "86") {
-                const cuitDigits = valClean.replace(/\D/g, "");
+                const cuitDigits = valClean.replace(/\D/g, "").replace(/^0+/, "");
                 if (cuitDigits.length !== 11) {
                     errors.push({
                         line: lineNum,
@@ -445,6 +507,34 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
                 }
             }
         }
+    }
+
+    const baseCalculo = parseAmount(rawFields["base_calculo"] || "");
+    const importeRetencion = parseAmount(rawFields["importe_retencion"] || "");
+    if (baseCalculo !== null && importeRetencion !== null && baseCalculo < importeRetencion) {
+        errors.push({
+            line: lineNum,
+            field: "base_calculo",
+            start: 53,
+            end: 66,
+            value: rawFields["base_calculo"],
+            rule: "base_menor_importe_retencion",
+            message: "La Base de Calculo no puede ser menor al Importe de Retencion."
+        });
+    }
+
+    const fechaComprobante = parseSicoreDate(rawFields["fecha_comprobante"] || "");
+    const fechaRetencion = parseSicoreDate(rawFields["fecha_retencion"] || "");
+    if (fechaComprobante && fechaRetencion && fechaComprobante > fechaRetencion) {
+        errors.push({
+            line: lineNum,
+            field: "fecha_comprobante",
+            start: 3,
+            end: 12,
+            value: rawFields["fecha_comprobante"],
+            rule: "fecha_comprobante_posterior_retencion",
+            message: "La Fecha de Comprobante no puede ser posterior a la Fecha de Retencion."
+        });
     }
 
     return errors;
