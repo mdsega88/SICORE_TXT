@@ -327,6 +327,11 @@ header p {
     background-color: hsla(222, 24%, 6%, 0.9);
 }
 
+.form-input.input-error {
+    border-color: var(--error);
+    box-shadow: 0 0 15px hsla(354, 76%, 53%, 0.28);
+}
+
 .form-hint {
     font-size: 0.78rem;
     color: var(--text-muted);

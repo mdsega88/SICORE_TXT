@@ -6,7 +6,16 @@ Ejecutar con: python -m unittest test_validator.py
 
 import unittest
 import os
-from validator import parse_amount, is_valid_cuit, validate_line, validate_sicore_file, detect_file_type
+import tempfile
+from validator import (
+    parse_amount,
+    is_valid_cuit,
+    validate_line,
+    validate_sicore_file,
+    detect_file_type,
+    write_execution_log,
+    LOG_DIR,
+)
 
 class TestSicoreValidator(unittest.TestCase):
     VALID_LINE = (
@@ -18,6 +27,13 @@ class TestSicoreValidator(unittest.TestCase):
     def replace_field(self, line, start, end, value):
         self.assertEqual(len(value), end - start + 1)
         return line[:start - 1] + value + line[end:]
+
+    def write_temp_sicore_file(self, temp_dir, lines_count=1):
+        path = os.path.join(temp_dir, "sample_sicore.txt")
+        with open(path, "w", encoding="utf-8", newline="\r\n") as f:
+            for _ in range(lines_count):
+                f.write(self.VALID_LINE + "\n")
+        return path
 
     def test_parse_amount(self):
         # Casos válidos
@@ -88,10 +104,19 @@ class TestSicoreValidator(unittest.TestCase):
 
     def test_validate_sample_file_success(self):
         # El archivo real de prueba debe validar 100% correcto para el período 01/2026
-        sample_path = "EMPRESA A-SICORE 2Q-01.2026-RET.txt"
-        
-        # Correr validador
-        res = validate_sicore_file(sample_path, "01/2026")
+        original_cwd = os.getcwd()
+        log_path = LOG_DIR / "SICORE-01-2026.txt"
+        if log_path.exists():
+            log_path.unlink()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                sample_path = self.write_temp_sicore_file(temp_dir, lines_count=29)
+                res = validate_sicore_file(sample_path, "01/2026")
+            finally:
+                os.chdir(original_cwd)
+                if log_path.exists():
+                    log_path.unlink()
         
         self.assertEqual(res["status"], "VALID")
         self.assertEqual(res["processed_lines"], 29)
@@ -100,15 +125,55 @@ class TestSicoreValidator(unittest.TestCase):
 
     def test_validate_sample_file_wrong_period(self):
         # Si validamos contra febrero 2026, debería dar inválido indicando los errores de período en fecha_retencion
-        sample_path = "EMPRESA A-SICORE 2Q-01.2026-RET.txt"
-        
-        res = validate_sicore_file(sample_path, "02/2026")
+        original_cwd = os.getcwd()
+        log_path = LOG_DIR / "SICORE-02-2026.txt"
+        if log_path.exists():
+            log_path.unlink()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            try:
+                os.chdir(temp_dir)
+                sample_path = self.write_temp_sicore_file(temp_dir, lines_count=29)
+                res = validate_sicore_file(sample_path, "02/2026")
+            finally:
+                os.chdir(original_cwd)
+                if log_path.exists():
+                    log_path.unlink()
         
         self.assertEqual(res["status"], "INVALID")
         self.assertEqual(res["processed_lines"], 29)
         # Cada una de las 29 líneas debería reportar el error de fecha_retencion fuera de período
         self.assertEqual(res["error_count"], 29)
         self.assertTrue(all(e["rule"] == "periodo_esperado" for e in res["errors"]))
+
+    def test_validate_file_requires_expected_period(self):
+        sample_path = "EMPRESA A-SICORE 2Q-01.2026-RET.txt"
+        res = validate_sicore_file(sample_path)
+
+        self.assertEqual(res["status"], "INVALID")
+        self.assertEqual(res["error_count"], 1)
+        self.assertEqual(res["errors"][0]["field"], "periodo")
+        self.assertEqual(res["errors"][0]["rule"], "periodo_obligatorio")
+
+    def test_execution_log_appends_by_period_file(self):
+        log_path = LOG_DIR / "SICORE-01-2026.txt"
+        if log_path.exists():
+            log_path.unlink()
+
+        try:
+            write_execution_log("uno.txt", "01/2026", "VALID", 0, "FULL")
+            write_execution_log("dos.txt", "01/2026", "INVALID", 3, "FULL")
+
+            self.assertTrue(log_path.exists())
+
+            with open(log_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            self.assertEqual(len(lines), 2)
+            self.assertIn("Archivo: uno.txt", lines[0])
+            self.assertIn("Archivo: dos.txt", lines[1])
+        finally:
+            if log_path.exists():
+                log_path.unlink()
 
     def test_certificado_original_optional(self):
         """El campo certificado_original puede ser blanco en formato FULL sin generar error."""

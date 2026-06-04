@@ -7,7 +7,7 @@
     <title>Validador Técnico SICORE | Estudio Contable</title>
     <meta name="description"
         content="Validador técnico automático para archivos TXT SICORE de ancho fijo. Verificación instantánea de formatos, fechas, importes y CUITs.">
-    <link rel="stylesheet" href="styles.css?v=20260528-1505">
+    <link rel="stylesheet" href="styles.css?v=20260603-1045">
 </head>
 
 <body>
@@ -45,7 +45,7 @@
                 <input type="file" id="fileInput" class="file-input" accept=".txt">
             </div>
 
-            <!-- Formulario del Período Esperado -->
+            <!-- Formulario del Periodo Esperado * -->
             <div class="card" id="periodCard">
                 <div class="form-group">
                     <label for="periodInput" class="form-label" id="periodLabel">
@@ -56,15 +56,14 @@
                             <line x1="8" y1="2" x2="8" y2="6" />
                             <line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
-                        Período Esperado
+                        Periodo Esperado *
                     </label>
                     <div class="input-wrapper">
                         <span class="input-icon">📅</span>
                         <input type="text" id="periodInput" class="form-input" placeholder="MM/AAAA" maxlength="7"
-                            autocomplete="off">
+                            autocomplete="off" required>
                     </div>
-                    <p class="form-hint" id="periodHint">Ej: 01/2026. Si se ingresa, se validará que todas las fechas de
-                        retención coincidan con este mes y año.</p>
+                    <p class="form-hint" id="periodHint">Obligatorio. Ej: 01/2026. Se validara que todas las fechas de retencion coincidan con este mes y anio.</p>
                 </div>
             </div>
         </main>
@@ -292,7 +291,7 @@
                                 <tr>
                                     <th>Fecha/Hora</th>
                                     <th>Nombre del Archivo</th>
-                                    <th>Período Esperado</th>
+                                    <th>Periodo Esperado</th>
                                     <th>Formato</th>
                                     <th>Estado</th>
                                     <th>Registros</th>
@@ -426,8 +425,8 @@
         </div>
 
         <!-- Scripts de validación y control -->
-        <script src="sicore-validator.js?v=20260528-1505"></script>
-        <script src="app.js?v=20260528-1505"></script>
+        <script src="sicore-validator.js?v=20260603-1045"></script>
+        <script src="app.js?v=20260603-1045"></script>
 </body>
 
 </html>

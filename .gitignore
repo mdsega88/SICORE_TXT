@@ -39,3 +39,4 @@ Thumbs.db
 
 # Local validation logs
 sicore_run_log.txt
+logs/

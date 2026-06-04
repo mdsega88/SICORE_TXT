@@ -72,6 +72,27 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentLines = [];
     let currentFileType = "FULL"; // Tipo detectado del archivo actual
     let parsedRecords = []; // Registros estructurados para el explorador
+    const PERIOD_PATTERN = /^(0[1-9]|1[0-2])\/\d{4}$/;
+
+    function periodToLogFileName(period) {
+        if (!PERIOD_PATTERN.test(period || "")) {
+            return "SICORE-SIN-PERIODO.txt";
+        }
+        const [month, year] = period.split("/");
+        return `SICORE-${month}-${year}.txt`;
+    }
+
+    function getExpectedPeriodOrAlert() {
+        const expectedPeriod = periodInput.value.trim();
+        if (!PERIOD_PATTERN.test(expectedPeriod)) {
+            periodInput.classList.add("input-error");
+            periodInput.focus();
+            alert("Para validar y analizar tenes que ingresar un periodo esperado en formato MM/AAAA. Ejemplo: 01/2026.");
+            return null;
+        }
+        periodInput.classList.remove("input-error");
+        return expectedPeriod;
+    }
 
     // Formatear input de período de manera interactiva (MM/AAAA)
     periodInput.addEventListener("input", (e) => {
@@ -80,11 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
             val = val.substring(0, 2) + "/" + val.substring(2, 6);
         }
         e.target.value = val;
-
-        // Re-validar si ya hay un archivo cargado y procesado
-        if (currentFileContent && dashboard.style.display === "flex") {
-            processFileContent(currentFileContent);
-        }
+        periodInput.classList.remove("input-error");
     });
 
     // Eventos de Drag & Drop para el Dropzone
@@ -181,19 +198,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Orquestador de validación y renderizado
-    function processFileContent(fileText) {
+    async function processFileContent(fileText) {
+        const expectedPeriod = getExpectedPeriodOrAlert();
+        if (!expectedPeriod) {
+            return;
+        }
         // Generar lista de líneas crudas para el visualizador
         currentLines = fileText.split(/\r?\n/);
         while (currentLines.length > 0 && currentLines[currentLines.length - 1].trim() === "") {
             currentLines.pop();
-        }
-
-        const expectedPeriod = periodInput.value;
-
-        // Validar período antes de procesar si está completo
-        if (expectedPeriod && expectedPeriod.length < 7) {
-            // No procesar hasta que esté completo MM/AAAA
-            return;
         }
 
         // Detectar tipo de archivo (FULL=198 / LITE=145)
@@ -240,7 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const report = validateSicoreFile(fileText, expectedPeriod);
 
         // Guardar la ejecución en el historial de logs
-        saveValidationLog(currentFileName || "archivo.txt", expectedPeriod, report);
+        await saveValidationLog(currentFileName || "archivo.txt", expectedPeriod, report);
 
         // Ocultar visualizador previo
         visualizerCard.style.display = "none";
@@ -715,12 +728,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- FUNCIONES DEL HISTORIAL DE LOGS ---
-    function saveValidationLog(fileName, period, report) {
+    async function saveValidationLog(fileName, period, report) {
         const logs = JSON.parse(localStorage.getItem("sicore_web_logs") || "[]");
         
         const timestamp = new Date().toLocaleString("es-AR");
         const statusStr = report.status === "VALID" ? "OK" : `CON ERRORES (${report.errorCount})`;
-        const periodStr = period ? period : "No especificado";
+        const periodStr = period;
+        const logFileName = periodToLogFileName(periodStr);
         
         const logLine = `[${new Date().toISOString().replace('T', ' ').substring(0, 19)}] Archivo: ${fileName} | Periodo: ${periodStr} | Formato: ${report.fileType} | Estado: ${statusStr}`;
 
@@ -729,6 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
             timestamp,
             fileName,
             period: periodStr,
+            logFileName,
             fileType: report.fileType,
             status: report.status,
             processedLines: report.processedLines,
@@ -738,6 +753,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
         logs.unshift(newLog); // Agregar al inicio
         localStorage.setItem("sicore_web_logs", JSON.stringify(logs));
+
+        try {
+            const response = await fetch("/api/log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    period: periodStr,
+                    logLine: logLine
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error("No se pudo guardar el log en disco:", error);
+            alert("La validacion termino, pero no se pudo guardar el log en la carpeta del codigo. Inicia la app con: python server.py");
+        }
     }
 
     function renderLogsTable() {
@@ -783,7 +816,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Listener para descargar este log individual
             const btn = tr.querySelector(".download-single-log-btn");
             btn.addEventListener("click", () => {
-                downloadTxtFile(`log_${log.fileName}`, log.logLine);
+                downloadTxtFile(log.logFileName || periodToLogFileName(log.period), log.logLine + "\n");
             });
 
             logsTableBody.appendChild(tr);
@@ -796,8 +829,19 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("No hay registros en el historial para descargar.");
             return;
         }
-        const text = logs.map(log => log.logLine).join("\n");
-        downloadTxtFile("sicore_run_log.txt", text);
+        const grouped = logs.reduce((acc, log) => {
+            const fileName = log.logFileName || periodToLogFileName(log.period);
+            if (!acc[fileName]) {
+                acc[fileName] = [];
+            }
+            acc[fileName].push(log.logLine);
+            return acc;
+        }, {});
+
+        Object.keys(grouped).forEach(fileName => {
+            const text = grouped[fileName].slice().reverse().join("\n") + "\n";
+            downloadTxtFile(fileName, text);
+        });
     }
 
     function clearLogs() {

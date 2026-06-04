@@ -11,6 +11,21 @@ import os
 import re
 import argparse
 from datetime import datetime
+from pathlib import Path
+
+PERIOD_PATTERN = re.compile(r"^(0[1-9]|1[0-2])/\d{4}$")
+
+
+def is_valid_period(period):
+    return bool(period and PERIOD_PATTERN.match(period))
+
+
+def period_log_filename(period):
+    month, year = period.split("/")
+    return f"SICORE-{month}-{year}.txt"
+
+
+LOG_DIR = Path(__file__).resolve().parent / "logs"
 
 # Definición parametrizada del Layout SICORE base oficial
 LAYOUT = [
@@ -548,6 +563,20 @@ def validate_sicore_file(file_path, expected_period=None):
         "file_type": "FULL"
     }
 
+    if not is_valid_period(expected_period):
+        report["status"] = "INVALID"
+        report["errors"].append({
+            "line": 0,
+            "field": "periodo",
+            "start": 0,
+            "end": 0,
+            "value": expected_period or "",
+            "rule": "periodo_obligatorio",
+            "message": "El periodo esperado es obligatorio y debe tener formato MM/AAAA (ej. 01/2026)."
+        })
+        report["error_count"] = 1
+        return report
+
     if not os.path.exists(file_path):
         report["status"] = "INVALID"
         report["errors"].append({
@@ -657,10 +686,11 @@ def write_execution_log(file_path, period, status, error_count, file_type):
     Guarda un logueo en un archivo txt local con el nombre del file, período,
     estado (OK o ERRORES) y la fecha/hora actual.
     """
-    log_file = "sicore_run_log.txt"
+    LOG_DIR.mkdir(exist_ok=True)
+    log_file = LOG_DIR / period_log_filename(period)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     file_name = os.path.basename(file_path)
-    period_str = period if period else "No especificado"
+    period_str = period
     status_str = "OK" if status == "VALID" else f"CON ERRORES ({error_count} observaciones)"
     
     log_line = f"[{timestamp}] Archivo: {file_name} | Periodo: {period_str} | Formato: {file_type} | Estado: {status_str}\n"
@@ -677,12 +707,12 @@ def write_execution_log(file_path, period, status, error_count, file_type):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Validador Técnico Local de archivos SICORE de ancho fijo.")
     parser.add_name = parser.add_argument("file_path", help="Ruta al archivo TXT de SICORE")
-    parser.add_argument("--period", help="Período esperado en formato MM/AAAA (ej: 01/2026)", default=None)
+    parser.add_argument("--period", required=True, help="Periodo esperado en formato MM/AAAA (ej: 01/2026)")
     
     args = parser.parse_args()
     
     # Validar formato de período si se ingresó
-    if args.period and not re.match(r"^\d{2}/\d{4}$", args.period):
+    if not is_valid_period(args.period):
         print("[ERROR] El período impositivo debe ingresarse con el formato MM/AAAA (ej. 01/2026).")
         exit(1)
         
