@@ -59,6 +59,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Modal de Detalle Digital
     const recordModal = document.getElementById("recordModal");
     const modalCloseBtn = document.getElementById("modalCloseBtn");
+    const rulesModal = document.getElementById("rulesModal");
+    const rulesModalTitle = document.getElementById("rulesModalTitle");
+    const rulesModalIntro = document.getElementById("rulesModalIntro");
+    const rulesModalTableBody = document.getElementById("rulesModalTableBody");
+    const rulesModalCloseBtn = document.getElementById("rulesModalCloseBtn");
 
     // Badge de formato de archivo
     const fileFormatBadge = document.getElementById("fileFormatBadge");
@@ -494,6 +499,62 @@ document.addEventListener("DOMContentLoaded", () => {
             .replace(/'/g, "&#039;");
     }
 
+    function getFieldLabel(fieldName) {
+        const field = LAYOUT.find(f => f.name === fieldName);
+        return field ? field.label : fieldName;
+    }
+
+    function formatCatalogValue(fieldName, rawValue) {
+        const clean = (rawValue || "").trim();
+        if (clean === "") {
+            return "-";
+        }
+
+        if (!CATALOGS[fieldName]) {
+            return clean;
+        }
+
+        const description = getCatalogDescription(fieldName, clean);
+        if (description) {
+            return `${clean} - ${description}`;
+        }
+        return `${clean} - Codigo no homologado`;
+    }
+
+    function getCatalogTitle(fieldName, rawValue) {
+        if (!CATALOGS[fieldName]) {
+            return "";
+        }
+        return formatCatalogValue(fieldName, rawValue);
+    }
+
+    function showRulesModal(fieldName) {
+        const catalog = CATALOGS[fieldName];
+        if (!catalog) {
+            return;
+        }
+
+        rulesModalTitle.textContent = getFieldLabel(fieldName);
+        rulesModalIntro.textContent = CATALOG_RULES[fieldName] || "Valores homologados para este campo.";
+        rulesModalTableBody.innerHTML = Object.entries(catalog).map(([code, label]) => `
+            <tr>
+                <td class="cell-mono">${escapeHtml(code)}</td>
+                <td>${escapeHtml(label)}</td>
+            </tr>
+        `).join("");
+        rulesModal.style.display = "flex";
+    }
+
+    document.addEventListener("click", (e) => {
+        const trigger = e.target.closest("[data-rule-field]");
+        if (!trigger) {
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        showRulesModal(trigger.dataset.ruleField);
+    });
+
     // --- SISTEMA DE SOLAPAS (TABS) ---
     tabValidation.addEventListener("click", () => {
         tabValidation.classList.add("active");
@@ -610,19 +671,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 const val = rec.fields[fieldName] || "";
                 const valClean = val.trim();
                 const error = rec.errors && rec.errors.find(e => e.field === fieldName);
+                const title = getCatalogTitle(fieldName, valClean);
 
                 let cellClass = "";
                 if (type === "amount") cellClass = "cell-amount";
                 else if (type === "mono") cellClass = "cell-mono";
 
                 if (error) {
+                    const errorTitle = title ? `${title}. ${error.message}` : error.message;
                     return `
-                        <td class="${cellClass} cell-error-highlight" title="${escapeHtml(error.message)}">
+                        <td class="${cellClass} cell-error-highlight" title="${escapeHtml(errorTitle)}">
                             ${escapeHtml(valClean === "" ? "VACÍO" : valClean)}
                         </td>
                     `;
                 } else {
-                    return `<td class="${cellClass}">${escapeHtml(valClean)}</td>`;
+                    return `<td class="${cellClass}"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(valClean)}</td>`;
                 }
             };
 
@@ -680,7 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const el = document.getElementById(`det_${f}`);
             if (el) {
                 const val = (rec.fields[f] || "").trim();
-                el.textContent = val === "" ? "-" : val;
+                el.textContent = formatCatalogValue(f, val);
 
                 // Si este campo tiene errores en el registro, lo marcamos visualmente
                 const error = rec.errors && rec.errors.find(e => e.field === f);
@@ -721,9 +784,19 @@ document.addEventListener("DOMContentLoaded", () => {
         recordModal.style.display = "none";
     });
 
+    rulesModalCloseBtn.addEventListener("click", () => {
+        rulesModal.style.display = "none";
+    });
+
     recordModal.addEventListener("click", (e) => {
         if (e.target === recordModal) {
             recordModal.style.display = "none";
+        }
+    });
+
+    rulesModal.addEventListener("click", (e) => {
+        if (e.target === rulesModal) {
+            rulesModal.style.display = "none";
         }
     });
 

@@ -7,7 +7,7 @@
     <title>Validador Técnico SICORE | Estudio Contable</title>
     <meta name="description"
         content="Validador técnico automático para archivos TXT SICORE de ancho fijo. Verificación instantánea de formatos, fechas, importes y CUITs.">
-    <link rel="stylesheet" href="styles.css?v=20260603-1045">
+    <link rel="stylesheet" href="styles.css?v=20260713-1300">
 </head>
 
 <body>
@@ -232,21 +232,21 @@
                             <thead>
                                 <tr>
                                     <th>Línea</th>
-                                    <th>Comp.</th>
+                                    <th><button class="rule-trigger" data-rule-field="codigo_comprobante" title="Ver valores permitidos">Comp.</button></th>
                                     <th>Fecha Emisión</th>
                                     <th>Nro. Comprobante</th>
                                     <th>Importe Comp.</th>
-                                    <th>Impuesto</th>
+                                    <th><button class="rule-trigger" data-rule-field="codigo_impuesto" title="Ver valores permitidos">Impuesto</button></th>
                                     <th>Régimen</th>
-                                    <th>Op.</th>
+                                    <th><button class="rule-trigger" data-rule-field="codigo_operacion" title="Ver valores permitidos">Op.</button></th>
                                     <th>Base Cálculo</th>
                                     <th>Fecha Ret.</th>
-                                    <th>Condición</th>
+                                    <th><button class="rule-trigger" data-rule-field="condicion" title="Ver valores permitidos">Condición</button></th>
                                     <th>Suj. Susp.</th>
                                     <th>Importe Ret.</th>
                                     <th>% Excl.</th>
                                     <th>Fecha Vig.</th>
-                                    <th>Tipo Doc</th>
+                                    <th><button class="rule-trigger" data-rule-field="tipo_documento" title="Ver valores permitidos">Tipo Doc</button></th>
                                     <th>Doc / CUIT</th>
                                     <th>Certif. Orig.</th>
                                     <th>Denominación Ordenante</th>
@@ -322,7 +322,7 @@
                     <div class="receipt-group">
                         <div class="receipt-group-title">Datos del Comprobante</div>
                         <div class="receipt-item">
-                            <div class="receipt-label">Código de Comprobante</div>
+                            <button class="receipt-label rule-trigger" data-rule-field="codigo_comprobante">Código de Comprobante</button>
                             <div class="receipt-val" id="det_codigo_comprobante">-</div>
                         </div>
                         <div class="receipt-item">
@@ -350,7 +350,7 @@
                             <div class="receipt-val" id="det_fecha_retencion">-</div>
                         </div>
                         <div class="receipt-item">
-                            <div class="receipt-label">Código de Impuesto</div>
+                            <button class="receipt-label rule-trigger" data-rule-field="codigo_impuesto">Código de Impuesto</button>
                             <div class="receipt-val" id="det_codigo_impuesto">-</div>
                         </div>
                         <div class="receipt-item">
@@ -358,11 +358,11 @@
                             <div class="receipt-val" id="det_codigo_regimen">-</div>
                         </div>
                         <div class="receipt-item">
-                            <div class="receipt-label">Código de Operación</div>
+                            <button class="receipt-label rule-trigger" data-rule-field="codigo_operacion">Código de Operación</button>
                             <div class="receipt-val" id="det_codigo_operacion">-</div>
                         </div>
                         <div class="receipt-item">
-                            <div class="receipt-label">Código de Condición</div>
+                            <button class="receipt-label rule-trigger" data-rule-field="condicion">Código de Condición</button>
                             <div class="receipt-val" id="det_condicion">-</div>
                         </div>
                         <div class="receipt-item">
@@ -386,7 +386,7 @@
                     <div class="receipt-group">
                         <div class="receipt-group-title">Datos del Retenido</div>
                         <div class="receipt-item">
-                            <div class="receipt-label">Tipo de Documento</div>
+                            <button class="receipt-label rule-trigger" data-rule-field="tipo_documento">Tipo de Documento</button>
                             <div class="receipt-val" id="det_tipo_documento">-</div>
                         </div>
                         <div class="receipt-item">
@@ -425,8 +425,34 @@
         </div>
 
         <!-- Scripts de validación y control -->
-        <script src="sicore-validator.js?v=20260603-1045"></script>
-        <script src="app.js?v=20260603-1045"></script>
+    </div>
+
+    <!-- Modal de Leyenda de Reglas -->
+    <div class="modal" id="rulesModal">
+        <div class="modal-content card rules-modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 id="rulesModalTitle">Valores permitidos</h2>
+                    <p class="rules-modal-intro" id="rulesModalIntro">Valores homologados para este campo.</p>
+                </div>
+                <button class="modal-close" id="rulesModalCloseBtn">âœ•</button>
+            </div>
+            <div class="table-container">
+                <table class="reader-table rules-table">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rulesModalTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+        <script src="sicore-validator.js?v=20260713-1300"></script>
+        <script src="app.js?v=20260713-1300"></script>
 </body>
 
 </html>

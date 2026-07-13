@@ -27,6 +27,95 @@ def period_log_filename(period):
 
 LOG_DIR = Path(__file__).resolve().parent / "logs"
 
+CATALOGS = {
+    "codigo_comprobante": {
+        "01": "Factura",
+        "02": "Recibo",
+        "03": "Nota de Credito",
+        "04": "Nota de Debito",
+        "05": "Otro comprobante",
+        "06": "Orden de Pago",
+        "07": "Recibo de Sueldo",
+        "08": "Recibo de Sueldo - Devolucion",
+        "09": "Escritura Publica",
+        "10": "C.1116",
+        "11": "Factura (16 Digitos)",
+        "12": "Recibo de Haberes",
+        "13": "Recibo de Haberes - Devolucion",
+    },
+    "codigo_impuesto": {
+        "064": "Fondo Nacional de Incentivo Docente",
+        "172": "Impuesto a la Transferencia de Inmuebles",
+        "210": "Ganancias Regimen Especial de Ingreso R.G. 830",
+        "217": "Impuesto a las Ganancias (Mercado Interno)",
+        "218": "Impuesto a las Ganancias - Beneficiarios del Exterior",
+        "219": "Impuesto sobre los Bienes Personales",
+        "466": "Gravamen de Emergencia a los Premios de Juegos de Sorteo",
+        "767": "Impuesto al Valor Agregado",
+    },
+    "codigo_operacion": {
+        "1": "Retencion",
+        "2": "Percepcion",
+        "4": "Imposibilidad de Retencion",
+    },
+    "condicion": {
+        "1": "Inscripto",
+        "2": "No inscripto",
+        "3": "No categorizado",
+        "6": "Contratacion hora dia estadia",
+        "7": "Contratacion mensual",
+        "8": "Incluido en el registro fiscal de granos",
+        "9": "No incluido en el registro fiscal de granos",
+        "10": "Inscripto demas sujetos",
+        "11": "Inscripto retenciones IVA estaciones de servicios",
+        "12": "Servicios publicos",
+        "13": "Venta de cosas muebles y locacion - Alicuota general",
+        "14": "Venta de cosas muebles y locacion - Alicuota reducida",
+        "15": "Retencion sustitutiva",
+        "16": "Sujetos suspendidos segun articulo 40 inc. A)",
+        "17": "Sujetos suspendidos segun articulo 40 inc. B)",
+        "18": "Aplica Convenio de Doble Imposicion",
+        "19": "No Aplica Convenio de Doble Imposicion",
+    },
+    "tipo_documento": {
+        "80": "C.U.I.T.",
+        "86": "C.U.I.L.",
+        "83": "Ident. Tributaria del Exterior",
+        "87": "C.D.I.",
+        "84": "Documento del Exterior",
+    },
+}
+
+EXTENDED_FIELDS = {
+    "denominacion_ordenante",
+    "acrecentamiento",
+    "cuit_pais_retenido",
+    "cuit_ordenante",
+}
+
+
+def normalize_catalog_code(field_name, raw_val):
+    value = raw_val.strip()
+    if value == "":
+        return ""
+
+    if field_name == "codigo_comprobante":
+        return value.zfill(2)
+    if field_name == "codigo_impuesto":
+        digits = re.sub(r"\D", "", value)
+        normalized = digits.lstrip("0") or "0"
+        return normalized.zfill(3) if len(normalized) < 3 else normalized
+    if field_name in {"codigo_operacion", "condicion"}:
+        digits = re.sub(r"\D", "", value)
+        return digits.lstrip("0") or "0"
+    if field_name == "tipo_documento":
+        return value.zfill(2)
+    return value
+
+
+def is_foreign_beneficiary_tax(raw_val):
+    return normalize_catalog_code("codigo_impuesto", raw_val) == "218"
+
 # Definición parametrizada del Layout SICORE base oficial
 LAYOUT = [
     {
@@ -35,8 +124,7 @@ LAYOUT = [
         "start": 1,
         "end": 2,
         "type": "string",
-        "required": True,
-        "allowed_values": ["01", "02", "03", "04", "05", "06", "07", "08", "09", "11"]
+        "required": True
     },
     {
         "name": "fecha_comprobante",
@@ -210,8 +298,8 @@ def parse_amount(val):
     """
     clean_val = val.strip()
     
-    # Debe contener una coma como separador decimal
-    if "," not in clean_val:
+    # Debe contener una unica coma como separador decimal
+    if clean_val.count(",") != 1:
         return None
         
     # Verificar que solo contenga dígitos, coma y opcionalmente signo menos
@@ -219,8 +307,8 @@ def parse_amount(val):
         return None
         
     parts = clean_val.split(",")
-    # Debe tener una parte entera y exactamente dos decimales
-    if len(parts) != 2 or len(parts[1]) != 2:
+    # SIAP tolera uno o mas decimales si la cadena respeta el ancho fijo.
+    if len(parts) != 2 or parts[0] in ["", "-"] or len(parts[1]) < 1:
         return None
         
     try:
@@ -250,7 +338,8 @@ def is_zero_value(raw_val, field_type):
         return False
 
     if field_type in ["amount", "amount_or_zero"]:
-        return re.match(r"^0+(,0+)?$", val_clean) is not None
+        parsed = parse_amount(raw_val)
+        return parsed == 0 if parsed is not None else re.match(r"^0+(,0+)?$", val_clean) is not None
 
     digits = re.sub(r"\D", "", val_clean)
     return digits != "" and re.match(r"^0+$", digits) is not None
@@ -348,6 +437,8 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
 
     # Filtrar campos según el tipo de archivo
     fields_to_validate = [f for f in LAYOUT if f["end"] <= 145] if file_type == "LITE" else LAYOUT
+    codigo_impuesto_raw = clean_line[44:48] if len(clean_line) >= 48 else ""
+    validate_extended_fields = file_type != "FULL" or is_foreign_beneficiary_tax(codigo_impuesto_raw)
 
     # Validar campo por campo
     for field in fields_to_validate:
@@ -361,6 +452,9 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
         # Extraer subcadena según la posición (1-based, inclusive)
         raw_val = clean_line[start-1:end]
         raw_fields[name] = raw_val
+
+        if file_type == "FULL" and name in EXTENDED_FIELDS and not validate_extended_fields:
+            continue
         
         if name == "tipo_documento":
             tipo_doc_val = raw_val
@@ -464,7 +558,7 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
                     "end": end,
                     "value": raw_val,
                     "rule": "formato_importe",
-                    "message": f"El campo '{label}' tiene un formato numérico inválido ({raw_val.strip()}). Debe ser numérico con coma decimal y dos decimales (ej. 00004958677,69)."
+                    "message": f"El campo '{label}' tiene un formato numérico inválido ({raw_val.strip()}). Debe ser numérico con coma decimal y al menos un decimal (ej. 00004958677,69 o 633471,3)."
                 })
                 
         elif f_type in ["integer", "integer_or_blank"]:
@@ -519,6 +613,33 @@ def validate_line(line_number, line_content, expected_period=None, file_type="FU
                         "rule": "formato_documento",
                         "message": f"El documento debe contener únicamente dígitos numéricos. Encontrado: '{val_clean}'."
                     })
+
+    for field_name, catalog in CATALOGS.items():
+        raw_val = raw_fields.get(field_name, "")
+        if raw_val.strip() == "":
+            continue
+        if any(
+            e["field"] == field_name
+            and e["rule"] in {"obligatorio", "valor_cero_no_permitido", "formato_entero"}
+            for e in errors
+        ):
+            continue
+        normalized = normalize_catalog_code(field_name, raw_val)
+        if normalized not in catalog:
+            field_def = next((f for f in LAYOUT if f["name"] == field_name), None)
+            label = field_def["label"] if field_def else field_name
+            start = field_def["start"] if field_def else 0
+            end = field_def["end"] if field_def else 0
+            allowed = ", ".join(catalog.keys())
+            errors.append({
+                "line": line_number,
+                "field": field_name,
+                "start": start,
+                "end": end,
+                "value": raw_val,
+                "rule": "codigo_no_homologado",
+                "message": f"El campo '{label}' tiene el codigo '{raw_val.strip()}', que no esta homologado por AFIP/SICORE. Valores permitidos: {allowed}."
+            })
 
     base_calculo = parse_amount(raw_fields.get("base_calculo", ""))
     importe_retencion = parse_amount(raw_fields.get("importe_retencion", ""))

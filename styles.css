@@ -987,6 +987,24 @@ header p {
     font-family: var(--font-heading);
 }
 
+.rule-trigger {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+}
+
+.rule-trigger:hover {
+    color: var(--text-primary);
+}
+
 .reader-table td {
     padding: 12px 14px;
     border-bottom: 1px solid var(--border-color);
@@ -1142,10 +1160,28 @@ header p {
     color: var(--text-secondary);
 }
 
+button.receipt-label {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+}
+
+button.receipt-label:hover {
+    color: var(--text-primary);
+}
+
 .receipt-val {
     font-weight: 500;
     color: var(--text-primary);
     text-align: right;
+    overflow-wrap: anywhere;
+    max-width: 60%;
 }
 
 .receipt-val.highlight-val {
@@ -1190,6 +1226,21 @@ header p {
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+.rules-modal-content {
+    max-width: 720px;
+}
+
+.rules-modal-intro {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 6px;
+    line-height: 1.45;
+}
+
+.rules-table td:first-child {
+    width: 120px;
 }
 
 /* Animations */

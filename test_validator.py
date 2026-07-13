@@ -7,6 +7,7 @@ Ejecutar con: python -m unittest test_validator.py
 import unittest
 import os
 import tempfile
+from pathlib import Path
 from validator import (
     parse_amount,
     is_valid_cuit,
@@ -41,11 +42,11 @@ class TestSicoreValidator(unittest.TestCase):
         self.assertEqual(parse_amount("0000006000000,00"), 6000000.0)
         self.assertEqual(parse_amount("000,00        "), 0.0)
         self.assertEqual(parse_amount("1,23"), 1.23)
+        self.assertEqual(parse_amount("        633471,3"), 633471.3)
+        self.assertEqual(parse_amount("     1085936,2"), 1085936.2)
         
         # Casos inválidos
         self.assertIsNone(parse_amount("123"))          # Sin coma
-        self.assertIsNone(parse_amount("123,4"))        # 1 decimal
-        self.assertIsNone(parse_amount("123,456"))      # 3 decimales
         self.assertIsNone(parse_amount("12a,45"))       # Carácter no numérico
         self.assertIsNone(parse_amount(" 123 , 45 "))   # Espacios internos incorrectos
 
@@ -265,6 +266,31 @@ class TestSicoreValidator(unittest.TestCase):
         lite_line = full_line[:145]
         self.assertEqual(len(lite_line), 145)
         self.assertEqual(detect_file_type([lite_line]), "LITE")
+
+    def test_july_change_acrovia_is_valid_without_extended_fields_for_217(self):
+        path = Path(__file__).resolve().parents[1] / "Pedido de Cambios Julio" / "V1" / "TXT PRUEBAS" / "ACROVIA-SICORE 1Q-05.2026-RET.txt"
+        res = validate_sicore_file(str(path), "05/2026")
+
+        self.assertEqual(res["status"], "VALID")
+        self.assertEqual(res["error_count"], 0)
+
+    def test_july_change_delta_accepts_siap_amount_tolerance(self):
+        path = Path(__file__).resolve().parents[1] / "Pedido de Cambios Julio" / "V1" / "TXT PRUEBAS" / "DELTA-SICORE 2Q-05.2026-RET.txt"
+        res = validate_sicore_file(str(path), "05/2026")
+
+        self.assertEqual(res["status"], "VALID")
+        self.assertEqual(res["error_count"], 0)
+
+    def test_july_change_jm_sport_rejects_invalid_condition_code(self):
+        path = Path(__file__).resolve().parents[1] / "Pedido de Cambios Julio" / "V1" / "TXT PRUEBAS" / "JM SPORT-SICORE-05.2026-RET.txt"
+        res = validate_sicore_file(str(path), "05/2026")
+        condition_errors = [
+            e for e in res["errors"]
+            if e["field"] == "condicion" and e["rule"] == "codigo_no_homologado"
+        ]
+
+        self.assertEqual(res["status"], "INVALID")
+        self.assertEqual([e["line"] for e in condition_errors], [31, 32])
 
 
 if __name__ == "__main__":

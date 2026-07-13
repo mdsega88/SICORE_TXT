@@ -5,7 +5,109 @@
  * Mantiene consistencia lógica absoluta con el core en Python.
  */
 
-// Layout parametrizado de referencia de SICORE base
+const CATALOGS = {
+    codigo_comprobante: {
+        "01": "Factura",
+        "02": "Recibo",
+        "03": "Nota de Credito",
+        "04": "Nota de Debito",
+        "05": "Otro comprobante",
+        "06": "Orden de Pago",
+        "07": "Recibo de Sueldo",
+        "08": "Recibo de Sueldo - Devolucion",
+        "09": "Escritura Publica",
+        "10": "C.1116",
+        "11": "Factura (16 Digitos)",
+        "12": "Recibo de Haberes",
+        "13": "Recibo de Haberes - Devolucion"
+    },
+    codigo_impuesto: {
+        "064": "Fondo Nacional de Incentivo Docente",
+        "172": "Impuesto a la Transferencia de Inmuebles",
+        "210": "Ganancias Regimen Especial de Ingreso R.G. 830",
+        "217": "Impuesto a las Ganancias (Mercado Interno)",
+        "218": "Impuesto a las Ganancias - Beneficiarios del Exterior",
+        "219": "Impuesto sobre los Bienes Personales",
+        "466": "Gravamen de Emergencia a los Premios de Juegos de Sorteo",
+        "767": "Impuesto al Valor Agregado"
+    },
+    codigo_operacion: {
+        "1": "Retencion",
+        "2": "Percepcion",
+        "4": "Imposibilidad de Retencion"
+    },
+    condicion: {
+        "1": "Inscripto",
+        "2": "No inscripto",
+        "3": "No categorizado",
+        "6": "Contratacion hora dia estadia",
+        "7": "Contratacion mensual",
+        "8": "Incluido en el registro fiscal de granos",
+        "9": "No incluido en el registro fiscal de granos",
+        "10": "Inscripto demas sujetos",
+        "11": "Inscripto retenciones IVA estaciones de servicios",
+        "12": "Servicios publicos",
+        "13": "Venta de cosas muebles y locacion - Alicuota general",
+        "14": "Venta de cosas muebles y locacion - Alicuota reducida",
+        "15": "Retencion sustitutiva",
+        "16": "Sujetos suspendidos segun articulo 40 inc. A)",
+        "17": "Sujetos suspendidos segun articulo 40 inc. B)",
+        "18": "Aplica Convenio de Doble Imposicion",
+        "19": "No Aplica Convenio de Doble Imposicion"
+    },
+    tipo_documento: {
+        "80": "C.U.I.T.",
+        "86": "C.U.I.L.",
+        "83": "Ident. Tributaria del Exterior",
+        "87": "C.D.I.",
+        "84": "Documento del Exterior"
+    }
+};
+
+const CATALOG_RULES = {
+    codigo_comprobante: "Debe existir en la tabla de comprobantes homologados para importacion SICORE.",
+    codigo_impuesto: "Debe existir en la tabla de impuestos admitidos. El codigo 218 activa campos extendidos de beneficiarios del exterior.",
+    codigo_operacion: "Debe indicar el tipo de operacion permitido por SIAP.",
+    condicion: "Debe existir en la tabla cerrada de condiciones AFIP/SICORE.",
+    tipo_documento: "Debe existir en la tabla de tipos de documento del sujeto retenido."
+};
+
+const EXTENDED_FIELDS = new Set([
+    "denominacion_ordenante",
+    "acrecentamiento",
+    "cuit_pais_retenido",
+    "cuit_ordenante"
+]);
+
+function normalizeCatalogCode(fieldName, rawVal) {
+    const value = (rawVal || "").trim();
+    if (value === "") return "";
+
+    if (fieldName === "codigo_comprobante") return value.padStart(2, "0");
+    if (fieldName === "codigo_impuesto") {
+        const digits = value.replace(/\D/g, "");
+        const normalized = digits.replace(/^0+/, "") || "0";
+        return normalized.length < 3 ? normalized.padStart(3, "0") : normalized;
+    }
+    if (fieldName === "codigo_operacion" || fieldName === "condicion") {
+        const digits = value.replace(/\D/g, "");
+        return digits.replace(/^0+/, "") || "0";
+    }
+    if (fieldName === "tipo_documento") return value.padStart(2, "0");
+    return value;
+}
+
+function getCatalogDescription(fieldName, rawVal) {
+    const catalog = CATALOGS[fieldName];
+    if (!catalog) return null;
+    const normalized = normalizeCatalogCode(fieldName, rawVal);
+    return catalog[normalized] || null;
+}
+
+function isForeignBeneficiaryTax(rawVal) {
+    return normalizeCatalogCode("codigo_impuesto", rawVal) === "218";
+}
+
 // Layout parametrizado de referencia de SICORE base oficial
 const LAYOUT = [
     {
@@ -14,8 +116,7 @@ const LAYOUT = [
         start: 1,
         end: 2,
         type: "string",
-        required: true,
-        allowedValues: ["01", "02", "03", "04", "05", "06", "07", "08", "09", "11"]
+        required: true
     },
     {
         name: "fecha_comprobante",
@@ -186,7 +287,7 @@ const LAYOUT = [
  */
 function parseAmount(val) {
     const cleanVal = val.trim();
-    if (!cleanVal.includes(",")) {
+    if ((cleanVal.match(/,/g) || []).length !== 1) {
         return null;
     }
 
@@ -197,7 +298,7 @@ function parseAmount(val) {
     }
 
     const parts = cleanVal.split(",");
-    if (parts.length !== 2 || parts[1].length !== 2) {
+    if (parts.length !== 2 || parts[0] === "" || parts[0] === "-" || parts[1].length < 1) {
         return null;
     }
 
@@ -226,7 +327,8 @@ function isZeroValue(rawVal, type) {
     }
 
     if (type === "amount" || type === "amount_or_zero") {
-        return /^0+(,0+)?$/.test(valClean);
+        const parsed = parseAmount(rawVal);
+        return parsed !== null ? parsed === 0 : /^0+(,0+)?$/.test(valClean);
     }
 
     const digits = valClean.replace(/\D/g, "");
@@ -321,11 +423,17 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
     const fieldsToValidate = fileType === "LITE"
         ? LAYOUT.filter(f => f.end <= 145)
         : LAYOUT;
+    const codigoImpuestoRaw = cleanLine.length >= 48 ? cleanLine.slice(44, 48) : "";
+    const validateExtendedFields = fileType !== "FULL" || isForeignBeneficiaryTax(codigoImpuestoRaw);
 
     for (const field of fieldsToValidate) {
         const { name, label, start, end, type, required, allowedValues } = field;
         const rawVal = cleanLine.slice(start - 1, end);
         rawFields[name] = rawVal;
+
+        if (fileType === "FULL" && EXTENDED_FIELDS.has(name) && !validateExtendedFields) {
+            continue;
+        }
 
         if (name === "tipo_documento") {
             tipoDocVal = rawVal;
@@ -447,7 +555,7 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
                     end,
                     value: rawVal,
                     rule: "formato_importe",
-                    message: `El campo '${label}' tiene un formato de importe inválido (${valClean}). Debe ser numérico con coma decimal y dos decimales (ej. 00004958677,69).`
+                    message: `El campo '${label}' tiene un formato de importe inválido (${valClean}). Debe ser numérico con coma decimal y al menos un decimal (ej. 00004958677,69 o 633471,3).`
                 });
             }
         } else if (type === "integer" || type === "integer_or_blank") {
@@ -508,6 +616,30 @@ function validateLine(lineNum, lineContent, expectedPeriod = null, fileType = "F
             }
         }
     }
+
+    Object.entries(CATALOGS).forEach(([fieldName, catalog]) => {
+        const rawVal = rawFields[fieldName] || "";
+        if (rawVal.trim() === "") return;
+        const alreadyHasBlockingFieldError = errors.some(e =>
+            e.field === fieldName &&
+            ["obligatorio", "valor_cero_no_permitido", "formato_entero"].includes(e.rule)
+        );
+        if (alreadyHasBlockingFieldError) return;
+        const normalized = normalizeCatalogCode(fieldName, rawVal);
+        if (!Object.prototype.hasOwnProperty.call(catalog, normalized)) {
+            const fieldDef = LAYOUT.find(f => f.name === fieldName);
+            const allowed = Object.keys(catalog).join(", ");
+            errors.push({
+                line: lineNum,
+                field: fieldName,
+                start: fieldDef ? fieldDef.start : 0,
+                end: fieldDef ? fieldDef.end : 0,
+                value: rawVal,
+                rule: "codigo_no_homologado",
+                message: `El campo '${fieldDef ? fieldDef.label : fieldName}' tiene el codigo '${rawVal.trim()}', que no esta homologado por AFIP/SICORE. Valores permitidos: ${allowed}.`
+            });
+        }
+    });
 
     const baseCalculo = parseAmount(rawFields["base_calculo"] || "");
     const importeRetencion = parseAmount(rawFields["importe_retencion"] || "");
